@@ -159,8 +159,8 @@ void UKzUserWidget::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
 {
 	Super::NativeOnFocusLost(InFocusEvent);
 
-	// The release of any in-flight press will go to the new focus owner: reset silently,
-	// otherwise the next press of the same input is swallowed as a repeat
+	// The release of any in-flight press will go to the new focus owner, so the state is reset
+	// here: otherwise the next press of the same input is swallowed as a repeat
 	ClearInput();
 }
 
@@ -376,8 +376,20 @@ bool UKzUserWidget::IsInputEnabled() const
 
 void UKzUserWidget::ClearInput()
 {
+	// Cleared before firing so the events see the input already gone, and moved out because a
+	// Released handler may clear the input again
+	TMap<EKzUIInputType, FKzUIInputPressedState> ClearedState = MoveTemp(InputPressedState);
 	InputPressedState.Empty();
 	LastTapTime.Empty();
+
+	// Losing the input cancels every in-flight press: notify so pending feedback can be undone
+	for (const auto& Pair : ClearedState)
+	{
+		if (SupportsInput(Pair.Key))
+		{
+			FireInputReleased(Pair.Key);
+		}
+	}
 }
 
 bool UKzUserWidget::SupportsInput(const EKzUIInputType Input) const

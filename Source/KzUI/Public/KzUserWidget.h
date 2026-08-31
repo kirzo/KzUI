@@ -154,7 +154,7 @@ public:
 	UFUNCTION(Category = "KzUI|Input", BlueprintCallable)
 	bool IsInputEnabled() const;
 
-	/** Resets runtime input state. */
+	/** Resets runtime input state, firing Released for the in-flight presses so their pending feedback can be undone. */
 	void ClearInput();
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintCallable)
