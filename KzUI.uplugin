@@ -1,0 +1,41 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "KzUI",
+	"Description": "Lightweight UMG framework: semantic UI input per local player with per-platform key mapping and device detection, geometric gamepad navigation, text styles, themed button prompts with inline icons and material variations, sound themes, settings and splash screen kits, modal prompts and screen paging.",
+	"Category": "User Interface",
+	"CreatedBy": "kirzo",
+	"CreatedByURL": "https://kirzo.dev",
+	"DocsURL": "https://github.com/kirzo/KzUI",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "KzUI",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "KzUIUncooked",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "KzUIEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "KzLib",
+			"Enabled": true
+		}
+	]
+}
