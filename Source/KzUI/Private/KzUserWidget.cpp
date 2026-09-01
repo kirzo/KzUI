@@ -168,6 +168,14 @@ void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	LifeTime += InDeltaTime;
 
+	// Input taken away mid press (console opened, suspended, a child took over) cancels it
+	if (!IsInputEnabled())
+	{
+		ClearInput();
+		Super::NativeTick(MyGeometry, InDeltaTime);
+		return;
+	}
+
 	for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
 	{
 		if (IsInputPressed(Input))
@@ -365,7 +373,8 @@ void UKzUserWidget::SetInputEnabled(const bool bNewEnabled)
 
 bool UKzUserWidget::IsInputEnabled() const
 {
-	if (!bInputEnabled || ChildWidget != nullptr)
+	// While the console is open its keys must bubble through to the game viewport untouched
+	if (!bInputEnabled || ChildWidget != nullptr || UKzUIInputSubsystem::IsConsoleActive())
 	{
 		return false;
 	}

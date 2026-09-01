@@ -81,6 +81,10 @@ public:
 	UFUNCTION(Category = KzUI, BlueprintPure)
 	bool IsInputSuspended() const;
 
+	/** Whether the engine console is open. While it is, KzUI widgets stop consuming input so it reaches the console. */
+	UFUNCTION(Category = KzUI, BlueprintPure)
+	static bool IsConsoleActive();
+
 	/** Replaces the sound theme for this player. Null reverts to the project-settings default. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)
 	void SetSoundTheme(UKzUISoundTheme* Theme) { SoundThemeOverride = Theme; }
@@ -102,6 +106,9 @@ private:
 
 	void OnFocusChanging(const FFocusEvent& FocusEvent, const FWeakWidgetPath& OldPath, const TSharedPtr<SWidget>& OldWidget, const FWidgetPath& NewPath, const TSharedPtr<SWidget>& NewWidget);
 	void RestoreStackFocus();
+	/** Whether the UI may take the focus: nothing outside the game owns the input and the focus is not held outside the game viewport. */
+	bool CanTakeFocus() const;
+
 	void ApplyCursorPolicy();
 	void SuspendOtherPlayers(UKzUserWidget* Widget, bool bSuspend);
 	bool IsEditorSimulating() const;

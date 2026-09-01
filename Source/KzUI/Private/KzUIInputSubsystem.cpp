@@ -11,6 +11,8 @@
 #include "Blueprint/WidgetTree.h"
 #include "Containers/Ticker.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Console.h"
+#include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
@@ -94,7 +96,7 @@ void UKzUIInputSubsystem::RegisterWidget(UKzUserWidget* Widget)
 		{
 			SuspendOtherPlayers(Widget, true);
 		}
-		if (Widget->IsFocusable() && !IsEditorSimulating())
+		if (Widget->IsFocusable() && CanTakeFocus())
 		{
 			Widget->SetFocus();
 		}
@@ -164,6 +166,14 @@ bool UKzUIInputSubsystem::IsInputSuspended() const
 	return false;
 }
 
+bool UKzUIInputSubsystem::IsConsoleActive()
+{
+	// The console reads its keys from the game viewport, at the end of the Slate bubble chain, so
+	// any widget that consumes them first leaves it deaf
+	const UGameViewportClient* ViewportClient = GEngine ? GEngine->GameViewport : nullptr;
+	return ViewportClient && ViewportClient->ViewportConsole && ViewportClient->ViewportConsole->ConsoleActive();
+}
+
 void UKzUIInputSubsystem::SuspendOtherPlayers(UKzUserWidget* Widget, bool bSuspend)
 {
 	const ULocalPlayer* Self = GetLocalPlayer<ULocalPlayer>();
@@ -187,8 +197,7 @@ void UKzUIInputSubsystem::SuspendOtherPlayers(UKzUserWidget* Widget, bool bSuspe
 
 void UKzUIInputSubsystem::FocusTopWidget()
 {
-	// While ejected in PIE (F8), the editor camera owns the viewport focus
-	if (IsEditorSimulating())
+	if (!CanTakeFocus())
 	{
 		return;
 	}
@@ -211,6 +220,37 @@ bool UKzUIInputSubsystem::IsEditorSimulating() const
 #else
 	return false;
 #endif
+}
+
+bool UKzUIInputSubsystem::CanTakeFocus() const
+{
+	// Something outside the game deliberately owns the input: the editor camera while ejected in
+	// PIE (F8), or the console, which focuses the viewport for itself
+	if (IsEditorSimulating() || IsConsoleActive())
+	{
+		return false;
+	}
+
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+	const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
+	const TSharedPtr<SWidget> Focused = SlateUser ? SlateUser->GetFocusedWidget() : nullptr;
+	if (!Focused)
+	{
+		return true;
+	}
+
+	// Focus held outside the game viewport means the game is not the active input target, which in
+	// the editor is any panel being worked on. Game widgets all live under the viewport, so this
+	// only ever refuses in editor situations.
+	const TSharedPtr<SWidget> ViewportWidget = LocalPlayer->ViewportClient ? LocalPlayer->ViewportClient->GetGameViewportWidget() : nullptr;
+	for (TSharedPtr<SWidget> Widget = Focused; Widget.IsValid(); Widget = Widget->GetParentWidget())
+	{
+		if (Widget == ViewportWidget)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void UKzUIInputSubsystem::SetCurrentInputDevice(EKzUIInputDevice NewInputDevice)
@@ -269,10 +309,10 @@ UKzUIIconTheme* UKzUIInputSubsystem::GetIconTheme() const
 
 void UKzUIInputSubsystem::OnAppActivationChanged(bool bActivated)
 {
-	// Give focus back to the topmost focusable widget when the application regains it
+	// Restore rather than force: on activation the focus may legitimately belong elsewhere
 	if (bActivated)
 	{
-		FocusTopWidget();
+		RestoreStackFocus();
 	}
 }
 

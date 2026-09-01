@@ -109,14 +109,14 @@ bool FKzUIInputPreprocessor::HandleKeyDownEvent(FSlateApplication& SlateApp, con
 	if (!bInjecting)
 	{
 		TrackDevice(InKeyEvent.GetUserIndex(), InKeyEvent.GetKey());
-		return IsStickDirectionKey(InKeyEvent.GetKey());
+		return !UKzUIInputSubsystem::IsConsoleActive() && IsStickDirectionKey(InKeyEvent.GetKey());
 	}
 	return false;
 }
 
 bool FKzUIInputPreprocessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
 {
-	return !bInjecting && IsStickDirectionKey(InKeyEvent.GetKey());
+	return !bInjecting && !UKzUIInputSubsystem::IsConsoleActive() && IsStickDirectionKey(InKeyEvent.GetKey());
 }
 
 bool FKzUIInputPreprocessor::HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
@@ -136,18 +136,23 @@ bool FKzUIInputPreprocessor::HandleAnalogInputEvent(FSlateApplication& SlateApp,
 	FAxisState& State = AxisStates.FindOrAdd({ InAnalogInputEvent.GetUserIndex(), InAnalogInputEvent.GetKey() });
 	const float Value = InAnalogInputEvent.GetAnalogValue();
 
+	// While the console owns the input nothing is synthesized, and leaving the key invalid releases
+	// whatever direction was held so no synthetic press is left stuck
 	FKey NewKey;
-	if (Value >= PressThreshold)
+	if (!UKzUIInputSubsystem::IsConsoleActive())
 	{
-		NewKey = Directions->Positive;
-	}
-	else if (Value <= -PressThreshold)
-	{
-		NewKey = Directions->Negative;
-	}
-	else if ((State.Key == Directions->Positive && Value >= ReleaseThreshold) || (State.Key == Directions->Negative && Value <= -ReleaseThreshold))
-	{
-		NewKey = State.Key;
+		if (Value >= PressThreshold)
+		{
+			NewKey = Directions->Positive;
+		}
+		else if (Value <= -PressThreshold)
+		{
+			NewKey = Directions->Negative;
+		}
+		else if ((State.Key == Directions->Positive && Value >= ReleaseThreshold) || (State.Key == Directions->Negative && Value <= -ReleaseThreshold))
+		{
+			NewKey = State.Key;
+		}
 	}
 
 	if (NewKey != State.Key)

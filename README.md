@@ -359,6 +359,7 @@ Nothing extra to enable; it is the default model:
 ## Notes and Caveats
 
 - **`KzTextBlock` does not support property bindings on `Text`**: call `SetText` instead.
+- **The engine console wins**: it takes the viewport focus for itself, so while it is open KzUI never restores focus to the stack, widgets stop consuming input and the stick synthesis stands down. `UKzUIInputSubsystem::IsConsoleActive` exposes the same check.
 - **Blueprint-implemented `IKzSelectableWidgetInterface`**: the auto-generated `Is Selectable` stub returns `false`; open it and return your own flag or `true`, or the widget will never be an option.
 - **`Switch on Option` enumerates the compiled widget tree**, statically. With a scoped `GetOptions` override, out-of-scope selectables still produce (harmless, never-firing) pins; disable them in the node's details if they bother you.
 - **Custom icon token names must not contain `:`**, reserved for the `{Token:Variation}` syntax.
