@@ -67,12 +67,9 @@ public:
 	UFUNCTION(Category = KzUI, BlueprintPure)
 	EKzUIInputDevice GetCurrentInputDevice() const { return CurrentInputDevice; }
 
+	/** Applies an input device to this player. Normally driven by the input events themselves; call it to force a device. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)
 	void SetCurrentInputDevice(EKzUIInputDevice NewInputDevice);
-
-	/** Re-reads the most recently used hardware device of this player and applies it. */
-	UFUNCTION(Category = KzUI, BlueprintCallable)
-	void RefreshCurrentInputDevice();
 
 	/** Suspends every widget input of this player until all sources resume. In-flight presses are cleared. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)
@@ -101,9 +98,6 @@ public:
 	UKzUIIconTheme* GetIconTheme() const;
 
 private:
-	UFUNCTION()
-	void OnHardwareDeviceChanged(const FPlatformUserId UserId, const FInputDeviceId DeviceId);
-
 	void OnAppActivationChanged(bool bActivated);
 
 	void OnFocusChanging(const FFocusEvent& FocusEvent, const FWeakWidgetPath& OldPath, const TSharedPtr<SWidget>& OldWidget, const FWidgetPath& NewPath, const TSharedPtr<SWidget>& NewWidget);

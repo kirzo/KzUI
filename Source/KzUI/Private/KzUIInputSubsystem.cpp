@@ -3,7 +3,7 @@
 #include "KzUIInputSubsystem.h"
 #include "KzUserWidget.h"
 #include "KzInputDeviceListener.h"
-#include "KzUIStickKeyProcessor.h"
+#include "KzUIInputPreprocessor.h"
 #include "KzUIInputSettings.h"
 #include "KzUISoundTheme.h"
 #include "KzUIIconTheme.h"
@@ -17,21 +17,6 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
 #include "Widgets/SViewport.h"
-#include "GameFramework/InputDeviceSubsystem.h"
-#include "GameFramework/InputSettings.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogKzUI, Log, All);
-
-// Devices whose scope has no HardwareDevices declaration arrive with an Unspecified primary
-// type (GameInput does not declare any), so the name mapping decides and the type is fallback
-static EKzUIInputDevice ToInputDevice(const FHardwareDeviceIdentifier& Device)
-{
-	if (const EKzUIInputDevice* Mapped = UKzUIInputSettings::Get()->DeviceMappings.Find(Device.HardwareDeviceIdentifier))
-	{
-		return *Mapped;
-	}
-	return Device.PrimaryDeviceType == EHardwareDevicePrimaryType::KeyboardAndMouse ? EKzUIInputDevice::Keyboard : EKzUIInputDevice::Xbox;
-}
 
 UKzUIInputSubsystem* UKzUIInputSubsystem::Get(const ULocalPlayer* LocalPlayer)
 {
@@ -40,28 +25,35 @@ UKzUIInputSubsystem* UKzUIInputSubsystem::Get(const ULocalPlayer* LocalPlayer)
 
 namespace
 {
-	// One app-wide processor shared by every local player, alive while any subsystem exists
-	TSharedPtr<FKzUIStickKeyProcessor> StickKeyProcessor;
-	int32 StickKeyProcessorUsers = 0;
+	// One app-wide preprocessor shared by every local player, alive while any subsystem exists
+	TSharedPtr<FKzUIInputPreprocessor> InputPreprocessor;
+	int32 InputPreprocessorUsers = 0;
 }
 
 void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	if (FSlateApplication::IsInitialized() && StickKeyProcessorUsers++ == 0)
+	if (FSlateApplication::IsInitialized() && InputPreprocessorUsers++ == 0)
 	{
-		StickKeyProcessor = MakeShared<FKzUIStickKeyProcessor>();
-		FSlateApplication::Get().RegisterInputPreProcessor(StickKeyProcessor);
+		InputPreprocessor = MakeShared<FKzUIInputPreprocessor>();
+		FSlateApplication::Get().RegisterInputPreProcessor(InputPreprocessor);
 	}
 
-	if (UInputDeviceSubsystem* DeviceSubsystem = UInputDeviceSubsystem::Get())
-	{
-		DeviceSubsystem->OnInputHardwareDeviceChanged.AddDynamic(this, &UKzUIInputSubsystem::OnHardwareDeviceChanged);
-	}
-
-	// The device may already differ from the default when this player is created
-	RefreshCurrentInputDevice();
+	// A player usually joins by pressing something, so adopt the device that input came from.
+	// Deferred because the local player is not registered with Slate yet at this point.
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this](float)
+		{
+			const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+			const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
+			EKzUIInputDevice Device = EKzUIInputDevice::Keyboard;
+			if (SlateUser && InputPreprocessor && InputPreprocessor->TryGetDeviceForSlateUser(SlateUser->GetUserIndex(), Device))
+			{
+				SetCurrentInputDevice(Device);
+			}
+			return false;
+		}
+	));
 
 	if (FSlateApplication::IsInitialized())
 	{
@@ -72,18 +64,13 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UKzUIInputSubsystem::Deinitialize()
 {
-	if (StickKeyProcessor && --StickKeyProcessorUsers == 0)
+	if (InputPreprocessor && --InputPreprocessorUsers == 0)
 	{
 		if (FSlateApplication::IsInitialized())
 		{
-			FSlateApplication::Get().UnregisterInputPreProcessor(StickKeyProcessor);
+			FSlateApplication::Get().UnregisterInputPreProcessor(InputPreprocessor);
 		}
-		StickKeyProcessor.Reset();
-	}
-
-	if (UInputDeviceSubsystem* DeviceSubsystem = UInputDeviceSubsystem::Get())
-	{
-		DeviceSubsystem->OnInputHardwareDeviceChanged.RemoveDynamic(this, &UKzUIInputSubsystem::OnHardwareDeviceChanged);
+		InputPreprocessor.Reset();
 	}
 
 	if (FSlateApplication::IsInitialized())
@@ -278,35 +265,6 @@ void UKzUIInputSubsystem::SetIconTheme(UKzUIIconTheme* Theme)
 UKzUIIconTheme* UKzUIInputSubsystem::GetIconTheme() const
 {
 	return IconThemeOverride ? IconThemeOverride.Get() : UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
-}
-
-void UKzUIInputSubsystem::OnHardwareDeviceChanged(const FPlatformUserId UserId, const FInputDeviceId DeviceId)
-{
-	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
-	if (LocalPlayer && LocalPlayer->GetPlatformUserId() == UserId)
-	{
-		RefreshCurrentInputDevice();
-	}
-}
-
-void UKzUIInputSubsystem::RefreshCurrentInputDevice()
-{
-	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
-	const UInputDeviceSubsystem* DeviceSubsystem = UInputDeviceSubsystem::Get();
-	if (!LocalPlayer || !DeviceSubsystem)
-	{
-		return;
-	}
-
-	const FHardwareDeviceIdentifier Device = DeviceSubsystem->GetMostRecentlyUsedHardwareDevice(LocalPlayer->GetPlatformUserId());
-	if (Device.HardwareDeviceIdentifier.IsNone())
-	{
-		return;
-	}
-
-	const EKzUIInputDevice InputDevice = ToInputDevice(Device);
-	UE_LOG(LogKzUI, Log, TEXT("Player %d hardware device: '%s' (class '%s', type %d) -> %s"), LocalPlayer->GetControllerId(), *Device.HardwareDeviceIdentifier.ToString(), *Device.InputClassName.ToString(), (int32)Device.PrimaryDeviceType, *UEnum::GetValueAsString(InputDevice));
-	SetCurrentInputDevice(InputDevice);
 }
 
 void UKzUIInputSubsystem::OnAppActivationChanged(bool bActivated)

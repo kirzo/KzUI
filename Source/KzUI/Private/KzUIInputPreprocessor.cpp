@@ -1,8 +1,16 @@
 // Copyright 2026 kirzo
 
-#include "KzUIStickKeyProcessor.h"
+#include "KzUIInputPreprocessor.h"
 
+#include "KzUIInputSettings.h"
+#include "KzUIInputSubsystem.h"
+
+#include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
+#include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "InputCoreTypes.h"
 #include "Misc/ConfigCacheIni.h"
 
@@ -51,9 +59,36 @@ namespace
 		static const FButtonRepeatDelays Delays;
 		return Delays;
 	}
+
+	UKzUIInputSubsystem* FindSubsystemForSlateUser(int32 UserIndex)
+	{
+		if (!GEngine)
+		{
+			return nullptr;
+		}
+
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			const UGameInstance* GameInstance = Context.OwningGameInstance;
+			if (!GameInstance)
+			{
+				continue;
+			}
+
+			for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
+			{
+				const TSharedPtr<const FSlateUser> SlateUser = Player ? Player->GetSlateUser() : nullptr;
+				if (SlateUser && SlateUser->GetUserIndex() == UserIndex)
+				{
+					return UKzUIInputSubsystem::Get(Player);
+				}
+			}
+		}
+		return nullptr;
+	}
 }
 
-void FKzUIStickKeyProcessor::Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor)
+void FKzUIInputPreprocessor::Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor)
 {
 	// Analog events only fire on value changes, so held directions repeat from here
 	const double Now = SlateApp.GetCurrentTime();
@@ -68,17 +103,29 @@ void FKzUIStickKeyProcessor::Tick(const float DeltaTime, FSlateApplication& Slat
 	}
 }
 
-bool FKzUIStickKeyProcessor::HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+bool FKzUIInputPreprocessor::HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+{
+	// Injected keys carry no device of their own: the analog event that produced them already tracked it
+	if (!bInjecting)
+	{
+		TrackDevice(InKeyEvent.GetUserIndex(), InKeyEvent.GetKey());
+		return IsStickDirectionKey(InKeyEvent.GetKey());
+	}
+	return false;
+}
+
+bool FKzUIInputPreprocessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
 {
 	return !bInjecting && IsStickDirectionKey(InKeyEvent.GetKey());
 }
 
-bool FKzUIStickKeyProcessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+bool FKzUIInputPreprocessor::HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
 {
-	return !bInjecting && IsStickDirectionKey(InKeyEvent.GetKey());
+	TrackDevice(MouseEvent.GetUserIndex(), MouseEvent.GetEffectingButton());
+	return false;
 }
 
-bool FKzUIStickKeyProcessor::HandleAnalogInputEvent(FSlateApplication& SlateApp, const FAnalogInputEvent& InAnalogInputEvent)
+bool FKzUIInputPreprocessor::HandleAnalogInputEvent(FSlateApplication& SlateApp, const FAnalogInputEvent& InAnalogInputEvent)
 {
 	const FStickDirectionKeys* Directions = GetAxisMap().Find(InAnalogInputEvent.GetKey());
 	if (!Directions)
@@ -111,6 +158,8 @@ bool FKzUIStickKeyProcessor::HandleAnalogInputEvent(FSlateApplication& SlateApp,
 		}
 		if (NewKey.IsValid())
 		{
+			// Tracked here and not on the injected key, which is dispatched outside the device scope
+			TrackDevice(InAnalogInputEvent.GetUserIndex(), InAnalogInputEvent.GetKey());
 			State.NextRepeatTime = SlateApp.GetCurrentTime() + GetButtonRepeatDelays().Initial;
 			InjectKeyEvent(SlateApp, NewKey, InAnalogInputEvent.GetUserIndex(), true, false);
 		}
@@ -121,7 +170,42 @@ bool FKzUIStickKeyProcessor::HandleAnalogInputEvent(FSlateApplication& SlateApp,
 	return false;
 }
 
-void FKzUIStickKeyProcessor::InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, bool bPress, bool bRepeat)
+bool FKzUIInputPreprocessor::TryGetDeviceForSlateUser(int32 UserIndex, EKzUIInputDevice& OutDevice) const
+{
+	if (const EKzUIInputDevice* Device = DevicesByUser.Find(UserIndex))
+	{
+		OutDevice = *Device;
+		return true;
+	}
+	return false;
+}
+
+void FKzUIInputPreprocessor::TrackDevice(int32 UserIndex, const FKey& Key)
+{
+	EKzUIInputDevice Device = EKzUIInputDevice::Keyboard;
+	if (Key.IsGamepadKey())
+	{
+		// Read while the backend is still dispatching the event: device ids are recycled between
+		// physical devices, so resolving one afterwards can name the wrong hardware
+		FName DeviceName;
+		if (const FInputDeviceScope* Scope = FInputDeviceScope::GetCurrent())
+		{
+			DeviceName = FName(*Scope->HardwareDeviceIdentifier);
+		}
+
+		const EKzUIInputDevice* Mapped = UKzUIInputSettings::Get()->DeviceMappings.Find(DeviceName);
+		Device = Mapped ? *Mapped : EKzUIInputDevice::Xbox;
+	}
+
+	DevicesByUser.Add(UserIndex, Device);
+
+	if (UKzUIInputSubsystem* Subsystem = FindSubsystemForSlateUser(UserIndex))
+	{
+		Subsystem->SetCurrentInputDevice(Device);
+	}
+}
+
+void FKzUIInputPreprocessor::InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, bool bPress, bool bRepeat)
 {
 	const FKeyEvent Event(Key, FModifierKeysState(), UserIndex, bRepeat, 0, 0);
 	TGuardValue<bool> Guard(bInjecting, true);

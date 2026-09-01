@@ -9,8 +9,6 @@
 
 #define LOCTEXT_NAMESPACE "KzUI"
 
-DEFINE_LOG_CATEGORY_STATIC(LogKzUI, Log, All);
-
 TArray<UWidget*> UKzOptionWidget::GetLinkedSelectables_Implementation() const
 {
 	// Hover and selection reach the inner texts so their styles react with the row
@@ -264,8 +262,6 @@ void UKzToggle::SetChecked(bool bNewChecked)
 
 void UKzToggle::RefreshValueVisuals()
 {
-	UE_LOG(LogKzUI, Verbose, TEXT("[%s] Toggle refresh: bChecked=%d Checked=%s Unchecked=%s ValueImage=%s"), *GetName(), bChecked, *GetNameSafe(CheckedBrush.GetResourceObject()), *GetNameSafe(UncheckedBrush.GetResourceObject()), *GetNameSafe(ValueImage));
-
 	if (ValueText)
 	{
 		ValueText->SetText(bChecked ? CheckedText : UncheckedText);
