@@ -34,7 +34,7 @@ public:
 	UPROPERTY(Category = Input, EditAnywhere, Config)
 	EKzUICursorPolicy CursorPolicy = EKzUICursorPolicy::Manual;
 
-	/** Maps hardware device identifier names (as reported by the input stack: WinDualShock, GameInput overrides, etc.) to icon device families. Unmatched keyboard/mouse devices resolve to Keyboard, anything else to Xbox. */
+	/** Maps hardware device identifier names (as reported by the input stack: WinDualShock, GameInput overrides, etc.) to icon device families. Unmatched keyboard/mouse devices resolve to Keyboard, anything else to the platform's own pad (Xbox on desktop). */
 	UPROPERTY(Category = Input, EditAnywhere, Config)
 	TMap<FName, EKzUIInputDevice> DeviceMappings;
 

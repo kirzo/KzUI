@@ -120,7 +120,7 @@ public:
 	FKzUIInputDefinitionOverride(EKzUIInputOverrideMode InMode, TArray<FKey> InKeys) : Super(InKeys), Mode(InMode) {}
 };
 
-/** Default key set for one UI input, with optional per-platform overrides. */
+/** Default key set for one UI input, with optional overrides for the keyboard and for each pad layout family. */
 USTRUCT(BlueprintType)
 struct KZUI_API FKzUIInputData
 {
@@ -137,30 +137,34 @@ public:
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (InlineEditConditionToggle))
 	bool bOverrideWindows = false;
 
-	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverrideWindows"))
+	/** Rewrites the keyboard and mouse keys of Default, whatever pad the player uses. */
+	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverrideWindows", DisplayName = "Keyboard"))
 	FKzUIInputDefinitionOverride Windows;
 
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (InlineEditConditionToggle))
 	bool bOverrideXbox = false;
 
+	/** Rewrites the gamepad keys of Default while the player's last pad is an Xbox one (or unmapped on desktop). */
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverrideXbox"))
 	FKzUIInputDefinitionOverride Xbox;
 
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (InlineEditConditionToggle))
 	bool bOverridePlayStation = false;
 
+	/** Rewrites the gamepad keys of Default while the player's last pad is a DualShock or DualSense. */
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverridePlayStation"))
 	FKzUIInputDefinitionOverride PlayStation;
 
 	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (InlineEditConditionToggle))
 	bool bOverrideSwitch = false;
 
-	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverrideSwitch"))
+	/** Rewrites the gamepad keys of Default while the player's last pad is a Nintendo one. */
+	UPROPERTY(Category = Input, EditDefaultsOnly, BlueprintReadOnly, meta = (EditCondition = "bOverrideSwitch", DisplayName = "Nintendo"))
 	FKzUIInputDefinitionOverride Switch;
 
 public:
-	/** Resolves the effective key set for the platform this build is running on. */
-	FKzUIInputDefinition GetInputDefinition() const;
+	/** Resolves the effective key set: the keyboard override on the keyboard keys plus the override of GamepadDevice's family on the gamepad keys. */
+	FKzUIInputDefinition GetInputDefinition(EKzUIInputDevice GamepadDevice) const;
 };
 
 DECLARE_DYNAMIC_DELEGATE(FKzUISimpleDelegate);

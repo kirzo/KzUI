@@ -5,11 +5,7 @@
 #include "KzUIInputSettings.h"
 #include "KzUIInputSubsystem.h"
 
-#include "Engine/Engine.h"
-#include "Engine/GameInstance.h"
-#include "Engine/LocalPlayer.h"
 #include "Framework/Application/SlateApplication.h"
-#include "Framework/Application/SlateUser.h"
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "InputCoreTypes.h"
 #include "Misc/ConfigCacheIni.h"
@@ -58,33 +54,6 @@ namespace
 	{
 		static const FButtonRepeatDelays Delays;
 		return Delays;
-	}
-
-	UKzUIInputSubsystem* FindSubsystemForSlateUser(int32 UserIndex)
-	{
-		if (!GEngine)
-		{
-			return nullptr;
-		}
-
-		for (const FWorldContext& Context : GEngine->GetWorldContexts())
-		{
-			const UGameInstance* GameInstance = Context.OwningGameInstance;
-			if (!GameInstance)
-			{
-				continue;
-			}
-
-			for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
-			{
-				const TSharedPtr<const FSlateUser> SlateUser = Player ? Player->GetSlateUser() : nullptr;
-				if (SlateUser && SlateUser->GetUserIndex() == UserIndex)
-				{
-					return UKzUIInputSubsystem::Get(Player);
-				}
-			}
-		}
-		return nullptr;
 	}
 }
 
@@ -199,12 +168,12 @@ void FKzUIInputPreprocessor::TrackDevice(int32 UserIndex, const FKey& Key)
 		}
 
 		const EKzUIInputDevice* Mapped = UKzUIInputSettings::Get()->DeviceMappings.Find(DeviceName);
-		Device = Mapped ? *Mapped : EKzUIInputDevice::Xbox;
+		Device = Mapped ? *Mapped : UKzUIInputSubsystem::GetPlatformGamepadDevice();
 	}
 
 	DevicesByUser.Add(UserIndex, Device);
 
-	if (UKzUIInputSubsystem* Subsystem = FindSubsystemForSlateUser(UserIndex))
+	if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::FindForSlateUser(UserIndex))
 	{
 		Subsystem->SetCurrentInputDevice(Device);
 	}

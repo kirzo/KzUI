@@ -63,7 +63,7 @@ Everything is driven from C++ base classes and project settings: your game suppl
 
 A few deliberate design decisions shape the whole plugin; knowing them makes everything else predictable:
 
-- **Semantic inputs, not keys.** Widgets react to *Accept* or *Back*, never to `Gamepad_FaceButton_Bottom`. The key mapping lives once in project settings, with per-platform overrides.
+- **Semantic inputs, not keys.** Widgets react to *Accept* or *Back*, never to `Gamepad_FaceButton_Bottom`. The key mapping lives once in project settings, with overrides for the keyboard and for each pad layout that follow the controller each player is using.
 - **One screen owns the focus.** A screen (`KzUserWidget`) keeps the user focus and manages an internal *hover* cursor between its options. Focus does not jump between buttons, which keeps local multiplayer routing sane.
 - **Unhandled input bubbles.** A widget only consumes an input it actually acted on. Anything else falls through: to a parent screen first, then to the game. Dual-use buttons (UI *and* gameplay) work out of the box.
 - **Hover is the cursor, Selected is the commit.** Navigation moves the hover; Accept commits the hovered option as the selection, which persists (a menu remembers its selected entry when you come back to it).
@@ -87,7 +87,7 @@ A few deliberate design decisions shape the whole plugin; knowing them makes eve
 ### Input core
 
 - **`EKzUIInputType`**: the semantic inputs `Back`, `Accept`, `Down`, `Up`, `Left`, `Right`, `Previous`, `Next`, `Start`, `Select`.
-- **`UKzUIInputSettings`**: project-wide key map per input, with per-platform overrides (Windows / Xbox / PlayStation / Switch) in `Override`, `Additive` or `Subtractive` mode, a trigger config per input, device-name mappings, cursor policy, default themes and prompt class.
+- **`UKzUIInputSettings`**: project-wide key map per input, with a keyboard override and per-pad-family overrides (Xbox / PlayStation / Nintendo, picked by each player's last controller) in `Override`, `Additive` or `Subtractive` mode, a trigger config per input, device-name mappings, cursor policy, default themes and prompt class.
 - **Input triggers**: `Press`, `DoubleTap`, `Chord` (Enhanced-Input-style: required inputs held first), `Hold` (with `GetInputHoldProgress` for progress bars).
 - **`UKzUIInputSubsystem`** (per local player): widget stack, focus restore policy, input suspension (`SuspendInput` / solo-input screens), input device tracking with change broadcasts, per-player theme overrides.
 - **`FKzUIStickKeyProcessor`**: normalizes analog sticks into digital `Gamepad_*Stick_*` keys with hysteresis and key-repeat for **every** gamepad backend, including pads that GameInput treats as generic controllers and that never send those keys natively.
@@ -148,12 +148,12 @@ The tutorials build on each other and mirror how a real game front-end comes tog
 
 Everything global lives in **Project Settings → Plugins → KzUI**:
 
-1. **Input Map**: every semantic input ships with gamepad defaults (Accept = bottom face button, Back = right face button, navigation = left stick + dpad, Previous/Next = shoulders, Start/Select = specials) and additive keyboard keys on desktop (WASD/arrows, Space, BackSpace, Enter, Tab). Adjust keys per input, per platform, in `Override`/`Additive`/`Subtractive` mode. The Switch entries demonstrate swapped Accept/Back.
-2. **Device Mappings**: hardware device name → icon family (`DualSense`, `DualShock`, `Xbox`, `Keyboard`...). The defaults cover XInput, WinDualShock and the common GameInput identifiers; add your own if your platform reports different names.
+1. **Input Map**: every semantic input ships with gamepad defaults (Accept = bottom face button, Back = right face button, navigation = left stick + dpad, Previous/Next = shoulders, Start/Select = specials) and additive keyboard keys (WASD/arrows, Space, BackSpace, Enter, Tab). Adjust keys per input in `Override`/`Additive`/`Subtractive` mode: the **Keyboard** override rewrites the keyboard and mouse keys, while **Xbox**, **Play Station** and **Nintendo** rewrite the gamepad keys whenever the player's last pad belongs to that family. The Nintendo entries demonstrate swapped Accept/Back.
+2. **Device Mappings**: hardware device name → device family (`DualSense`, `DualShock`, `Xbox`, `Switch`, `Keyboard`...), used for both the icons and the pad overrides. The defaults cover XInput, WinDualShock, the common GameInput identifiers and [SDLGamepad](https://github.com/kirzo/SDLGamepad); add your own if your platform reports different names.
 3. **Cursor Policy**: `Manual` (KzUI never touches the mouse cursor) or `ByDevice` (cursor visible only while the player uses keyboard/mouse).
 4. **Sound Theme / Icon Theme / Prompt Class**: assign once; later tutorials create them.
 
-> Per-platform key overrides resolve by the running platform, so PS/Xbox/Switch branches only take effect in cooked builds for those platforms.
+> Pad overrides follow the controller, not the platform: a Switch Pro Controller on PC gets the Nintendo entries. Before a player touches a pad, and for pads with no device mapping, the platform's own family applies (Xbox on desktop).
 
 ### 2. Your First Navigable Menu
 
@@ -363,7 +363,7 @@ Nothing extra to enable; it is the default model:
 - **Blueprint-implemented `IKzSelectableWidgetInterface`**: the auto-generated `Is Selectable` stub returns `false`; open it and return your own flag or `true`, or the widget will never be an option.
 - **`Switch on Option` enumerates the compiled widget tree**, statically. With a scoped `GetOptions` override, out-of-scope selectables still produce (harmless, never-firing) pins; disable them in the node's details if they bother you.
 - **Custom icon token names must not contain `:`**, reserved for the `{Token:Variation}` syntax.
-- **Per-platform input overrides resolve by running platform**: PS/Xbox/Switch branches only apply in cooked builds for those platforms.
+- **Pad overrides follow each player's last pad family**, also while that player is on keyboard. Unmapped pads count as the platform's own family; add their hardware id to Device Mappings to change it.
 - **Theme assets referenced from settings**: config paths are not fixed up by redirectors; re-pick the asset in Project Settings if you rename it.
 - **Mouse support** is positional (hover under cursor, click to accept) on navigables and prompts; the cursor itself follows the `CursorPolicy`.
 

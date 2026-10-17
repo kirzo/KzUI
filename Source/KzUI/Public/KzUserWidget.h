@@ -77,7 +77,8 @@ private:
 	/** Visibility to restore when the child opened with bHideWhileOpen is removed. */
 	TOptional<ESlateVisibility> VisibilityBeforeChild;
 
-	TMap<EKzUIInputType, FKzUIInputDefinition> InputMap;
+	/** Keys replaced on this instance through OverrideInputMap. Every other input resolves from the project settings on each lookup, so it follows the player's pad. */
+	TMap<EKzUIInputType, FKzUIInputDefinition> InputMapOverrides;
 
 	TMap<EKzUIInputType, FKzUIInputTriggerConfig> TriggerMap;
 
@@ -205,6 +206,12 @@ protected:
 private:
 	EKzUIInputResult FireInputTriggered(const EKzUIInputType Input);
 	EKzUIInputResult FireInputReleased(const EKzUIInputType Input);
+
+	/** Family of the owning player's last pad, which picks the gamepad key overrides. */
+	EKzUIInputDevice GetGamepadDevice() const;
+
+	/** This instance's override, or the project settings resolved for the owning player's pad. */
+	FKzUIInputDefinition GetInputDefinition(EKzUIInputType Input) const;
 
 public:
 

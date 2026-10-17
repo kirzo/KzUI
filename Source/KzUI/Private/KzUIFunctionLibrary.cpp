@@ -2,6 +2,7 @@
 
 #include "KzUIFunctionLibrary.h"
 #include "KzUIInputSettings.h"
+#include "KzUIInputSubsystem.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
@@ -65,9 +66,11 @@ bool UKzUIFunctionLibrary::IsWidgetNamed(const UWidget* Widget, FName Name)
 EKzUIInputType UKzUIFunctionLibrary::GetInputFromKeyEvent(const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
+	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::FindForSlateUser(InKeyEvent.GetUserIndex());
+	const EKzUIInputDevice GamepadDevice = Subsystem ? Subsystem->GetGamepadDevice() : UKzUIInputSubsystem::GetPlatformGamepadDevice();
 	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
 	{
-		if (Pair.Value.GetInputDefinition().Contains(Key))
+		if (Pair.Value.GetInputDefinition(GamepadDevice).Contains(Key))
 		{
 			return Pair.Key;
 		}

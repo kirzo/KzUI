@@ -31,7 +31,9 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UKzUserWidget>> WidgetStack;
 
-	EKzUIInputDevice CurrentInputDevice = EKzUIInputDevice::Xbox;
+	EKzUIInputDevice CurrentInputDevice = GetPlatformGamepadDevice();
+
+	EKzUIInputDevice GamepadDevice = GetPlatformGamepadDevice();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UKzUISoundTheme> SoundThemeOverride;
@@ -51,6 +53,12 @@ public:
 
 	static UKzUIInputSubsystem* Get(const ULocalPlayer* LocalPlayer);
 
+	/** Subsystem of the local player Slate routes the given user index to. */
+	static UKzUIInputSubsystem* FindForSlateUser(int32 UserIndex);
+
+	/** Pad family native to the running platform: the fallback for unmapped pads and the gamepad device before any pad is used. */
+	static EKzUIInputDevice GetPlatformGamepadDevice();
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -66,6 +74,9 @@ public:
 
 	UFUNCTION(Category = KzUI, BlueprintPure)
 	EKzUIInputDevice GetCurrentInputDevice() const { return CurrentInputDevice; }
+
+	/** Family of the last pad this player used; it picks the gamepad key overrides, also while on keyboard. */
+	EKzUIInputDevice GetGamepadDevice() const { return GamepadDevice; }
 
 	/** Applies an input device to this player. Normally driven by the input events themselves; call it to force a device. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)

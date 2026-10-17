@@ -4,10 +4,11 @@
 
 UKzUIInputSettings::UKzUIInputSettings()
 {
-	// WinDualShock names, plus the GameInput family names and common GameInput id overrides
+	// WinDualShock names, the GameInput family names and common id overrides, and SDLGamepad ids
 	DeviceMappings.Add("DualSense", EKzUIInputDevice::DualSense);
 	DeviceMappings.Add("DualShock", EKzUIInputDevice::DualShock);
 	DeviceMappings.Add("DualShock4", EKzUIInputDevice::DualShock);
+	DeviceMappings.Add("SwitchPro", EKzUIInputDevice::Switch);
 	DeviceMappings.Add("XboxOne", EKzUIInputDevice::Xbox);
 	DeviceMappings.Add("Xbox360", EKzUIInputDevice::Xbox);
 	DeviceMappings.Add("XInputController", EKzUIInputDevice::Xbox);

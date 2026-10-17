@@ -16,6 +16,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/PlatformProperties.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
 #include "Widgets/SViewport.h"
@@ -23,6 +24,51 @@
 UKzUIInputSubsystem* UKzUIInputSubsystem::Get(const ULocalPlayer* LocalPlayer)
 {
 	return LocalPlayer ? LocalPlayer->GetSubsystem<UKzUIInputSubsystem>() : nullptr;
+}
+
+UKzUIInputSubsystem* UKzUIInputSubsystem::FindForSlateUser(int32 UserIndex)
+{
+	if (!GEngine)
+	{
+		return nullptr;
+	}
+
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		const UGameInstance* GameInstance = Context.OwningGameInstance;
+		if (!GameInstance)
+		{
+			continue;
+		}
+
+		for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
+		{
+			const TSharedPtr<const FSlateUser> SlateUser = Player ? Player->GetSlateUser() : nullptr;
+			if (SlateUser && SlateUser->GetUserIndex() == UserIndex)
+			{
+				return Get(Player);
+			}
+		}
+	}
+	return nullptr;
+}
+
+EKzUIInputDevice UKzUIInputSubsystem::GetPlatformGamepadDevice()
+{
+	const FString Platform = FPlatformProperties::IniPlatformName();
+	if (Platform == TEXT("PS4"))
+	{
+		return EKzUIInputDevice::DualShock;
+	}
+	if (Platform == TEXT("PS5"))
+	{
+		return EKzUIInputDevice::DualSense;
+	}
+	if (Platform == TEXT("Switch"))
+	{
+		return EKzUIInputDevice::Switch;
+	}
+	return EKzUIInputDevice::Xbox;
 }
 
 namespace
@@ -255,6 +301,11 @@ bool UKzUIInputSubsystem::CanTakeFocus() const
 
 void UKzUIInputSubsystem::SetCurrentInputDevice(EKzUIInputDevice NewInputDevice)
 {
+	if (NewInputDevice != EKzUIInputDevice::Keyboard)
+	{
+		GamepadDevice = NewInputDevice;
+	}
+
 	if (CurrentInputDevice == NewInputDevice)
 	{
 		return;

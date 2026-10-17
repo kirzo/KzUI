@@ -65,7 +65,6 @@ void UKzUserWidget::NativeConstruct()
 {
 	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
 	{
-		InputMap.Add(Pair.Key, Pair.Value.GetInputDefinition());
 		TriggerMap.Add(Pair.Key, Pair.Value.TriggerConfig);
 	}
 
@@ -444,11 +443,29 @@ float UKzUserWidget::GetInputHoldProgress(const EKzUIInputType Input) const
 	return 1.0f;
 }
 
+EKzUIInputDevice UKzUserWidget::GetGamepadDevice() const
+{
+	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer());
+	return Subsystem ? Subsystem->GetGamepadDevice() : UKzUIInputSubsystem::GetPlatformGamepadDevice();
+}
+
+FKzUIInputDefinition UKzUserWidget::GetInputDefinition(EKzUIInputType Input) const
+{
+	if (const FKzUIInputDefinition* Override = InputMapOverrides.Find(Input))
+	{
+		return *Override;
+	}
+
+	const FKzUIInputData* Data = UKzUIInputSettings::Get()->InputMap.Find(Input);
+	return Data ? Data->GetInputDefinition(GetGamepadDevice()) : FKzUIInputDefinition();
+}
+
 EKzUIInputType UKzUserWidget::GetInputFromKey(const FKey& Key) const
 {
-	for (const auto& Pair : InputMap)
+	// The preprocessor tracks the pad before the key gets here, so a pad key resolves with its own family
+	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
 	{
-		if (Pair.Value.Contains(Key))
+		if (GetInputDefinition(Pair.Key).Contains(Key))
 		{
 			return Pair.Key;
 		}
@@ -458,23 +475,21 @@ EKzUIInputType UKzUserWidget::GetInputFromKey(const FKey& Key) const
 
 bool UKzUserWidget::IsInputMappedToKey(EKzUIInputType Input, const FKey& Key) const
 {
-	const FKzUIInputDefinition* InputDefinition = InputMap.Find(Input);
-	return InputDefinition && InputDefinition->Contains(Key);
+	return GetInputDefinition(Input).Contains(Key);
 }
 
 void UKzUserWidget::ResetInputMap(EKzUIInputType Input)
 {
-	const UKzUIInputSettings* Settings = UKzUIInputSettings::Get();
-	if (Settings->InputMap.Contains(Input))
+	InputMapOverrides.Remove(Input);
+	if (const FKzUIInputData* Data = UKzUIInputSettings::Get()->InputMap.Find(Input))
 	{
-		InputMap.Add(Input, Settings->InputMap[Input].GetInputDefinition());
-		TriggerMap.Add(Input, Settings->InputMap[Input].TriggerConfig);
+		TriggerMap.Add(Input, Data->TriggerConfig);
 	}
 }
 
 void UKzUserWidget::OverrideInputMap(const EKzUIInputType Input, TArray<FKey> Keys)
 {
-	InputMap.Add(Input, FKzUIInputDefinition(Keys));
+	InputMapOverrides.Add(Input, FKzUIInputDefinition(Keys));
 	InputPressedState.Remove(Input);
 }
 

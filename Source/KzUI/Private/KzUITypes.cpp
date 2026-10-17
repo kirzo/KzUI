@@ -1,47 +1,66 @@
 // Copyright 2026 kirzo
 
 #include "KzUITypes.h"
-#include "HAL/PlatformProperties.h"
 
-static FKzUIInputDefinition ApplyOverride(const FKzUIInputDefinition& Base, const FKzUIInputDefinitionOverride& Override)
+static TArray<FKey> ApplyOverride(TArray<FKey> Keys, const FKzUIInputDefinitionOverride& Override)
 {
 	switch (Override.Mode)
 	{
 		case EKzUIInputOverrideMode::Override:
 		{
-			return Override;
+			return Override.GetKeys();
 		}
 		case EKzUIInputOverrideMode::Additive:
 		{
-			TArray<FKey> Keys = Base.GetKeys();
 			Keys.Append(Override.GetKeys());
-			return FKzUIInputDefinition(Keys);
+			return Keys;
 		}
 		case EKzUIInputOverrideMode::Subtractive:
 		{
-			TArray<FKey> Keys = Base.GetKeys();
 			Keys.RemoveAll([ToRemove = Override.GetKeys()](const FKey& Key) { return ToRemove.Contains(Key); });
-			return FKzUIInputDefinition(Keys);
+			return Keys;
 		}
 	}
-	return Base;
+	return Keys;
 }
 
-FKzUIInputDefinition FKzUIInputData::GetInputDefinition() const
+FKzUIInputDefinition FKzUIInputData::GetInputDefinition(EKzUIInputDevice GamepadDevice) const
 {
-	const FString Platform = FPlatformProperties::IniPlatformName();
-	if (Platform == TEXT("PS4") || Platform == TEXT("PS5"))
+	// Each override only rewrites its own device's keys, so an Override-mode pad entry never drops the keyboard
+	TArray<FKey> KeyboardKeys;
+	TArray<FKey> GamepadKeys;
+	for (const FKey& Key : Default.GetKeys())
 	{
-		return bOverridePlayStation ? ApplyOverride(Default, PlayStation) : Default;
+		(Key.IsGamepadKey() ? GamepadKeys : KeyboardKeys).Add(Key);
 	}
-	if (Platform.Contains(TEXT("Xbox")) || Platform == TEXT("XSX"))
+
+	if (bOverrideWindows)
 	{
-		return bOverrideXbox ? ApplyOverride(Default, Xbox) : Default;
+		KeyboardKeys = ApplyOverride(MoveTemp(KeyboardKeys), Windows);
 	}
-	if (Platform == TEXT("Switch"))
+
+	const FKzUIInputDefinitionOverride* GamepadOverride = nullptr;
+	switch (GamepadDevice)
 	{
-		return bOverrideSwitch ? ApplyOverride(Default, Switch) : Default;
+		case EKzUIInputDevice::Xbox:
+			GamepadOverride = bOverrideXbox ? &Xbox : nullptr;
+			break;
+		case EKzUIInputDevice::DualShock:
+		case EKzUIInputDevice::DualSense:
+			GamepadOverride = bOverridePlayStation ? &PlayStation : nullptr;
+			break;
+		case EKzUIInputDevice::Switch:
+			GamepadOverride = bOverrideSwitch ? &Switch : nullptr;
+			break;
+		default:
+			break;
 	}
-	// Any desktop platform uses the Windows override
-	return bOverrideWindows ? ApplyOverride(Default, Windows) : Default;
+
+	if (GamepadOverride)
+	{
+		GamepadKeys = ApplyOverride(MoveTemp(GamepadKeys), *GamepadOverride);
+	}
+
+	KeyboardKeys.Append(GamepadKeys);
+	return FKzUIInputDefinition(KeyboardKeys);
 }
