@@ -16,6 +16,8 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
+#include "GenericPlatform/GenericApplicationMessageHandler.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "HAL/PlatformProperties.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
@@ -76,6 +78,39 @@ namespace
 	// One app-wide preprocessor shared by every local player, alive while any subsystem exists
 	TSharedPtr<FKzUIInputPreprocessor> InputPreprocessor;
 	int32 InputPreprocessorUsers = 0;
+
+	// Pad family of every connected device whose backend told us its hardware
+	TMap<FInputDeviceId, EKzUIInputDevice> ConnectedPads;
+
+	const EKzUIInputDevice* FindConnectedPad(FPlatformUserId UserId)
+	{
+		TArray<FInputDeviceId> Devices;
+		IPlatformInputDeviceMapper::Get().GetAllInputDevicesForUser(UserId, Devices);
+		for (const FInputDeviceId Device : Devices)
+		{
+			if (const EKzUIInputDevice* PadDevice = ConnectedPads.Find(Device))
+			{
+				return PadDevice;
+			}
+		}
+		return nullptr;
+	}
+}
+
+void UKzUIInputSubsystem::HandleInputDeviceConnectionChange(EInputDeviceConnectionState NewConnectionState, FPlatformUserId PlatformUserId, FInputDeviceId InputDeviceId)
+{
+	if (NewConnectionState != EInputDeviceConnectionState::Connected)
+	{
+		ConnectedPads.Remove(InputDeviceId);
+		return;
+	}
+
+	const FInputDeviceScope* Scope = FInputDeviceScope::GetCurrent();
+	if (Scope && !Scope->HardwareDeviceIdentifier.IsEmpty())
+	{
+		const EKzUIInputDevice* Mapped = UKzUIInputSettings::Get()->DeviceMappings.Find(FName(*Scope->HardwareDeviceIdentifier));
+		ConnectedPads.Add(InputDeviceId, Mapped ? *Mapped : GetPlatformGamepadDevice());
+	}
 }
 
 void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -88,11 +123,16 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		FSlateApplication::Get().RegisterInputPreProcessor(InputPreprocessor);
 	}
 
-	// A player usually joins by pressing something, so adopt the device that input came from.
-	// Deferred because the local player is not registered with Slate yet at this point.
+	// Start on the pad the platform assigned to this player; a player who joined by pressing something
+	// adopts the device that input came from instead. Deferred because the local player is not registered with Slate yet.
 	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this](float)
 		{
 			const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+			if (const EKzUIInputDevice* PadDevice = LocalPlayer ? FindConnectedPad(LocalPlayer->GetPlatformUserId()) : nullptr)
+			{
+				SetCurrentInputDevice(*PadDevice);
+			}
+
 			const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
 			EKzUIInputDevice Device = EKzUIInputDevice::Keyboard;
 			if (SlateUser && InputPreprocessor && InputPreprocessor->TryGetDeviceForSlateUser(SlateUser->GetUserIndex(), Device))

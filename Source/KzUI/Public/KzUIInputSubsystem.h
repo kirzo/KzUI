@@ -59,6 +59,9 @@ public:
 	/** Pad family native to the running platform: the fallback for unmapped pads and the gamepad device before any pad is used. */
 	static EKzUIInputDevice GetPlatformGamepadDevice();
 
+	/** Records the family of pads whose backend announces the connection inside their device scope, so a player starts on their own pad's prompts. Bound by the module. */
+	static void HandleInputDeviceConnectionChange(EInputDeviceConnectionState NewConnectionState, FPlatformUserId PlatformUserId, FInputDeviceId InputDeviceId);
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 

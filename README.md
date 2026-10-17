@@ -153,7 +153,7 @@ Everything global lives in **Project Settings → Plugins → KzUI**:
 3. **Cursor Policy**: `Manual` (KzUI never touches the mouse cursor) or `ByDevice` (cursor visible only while the player uses keyboard/mouse).
 4. **Sound Theme / Icon Theme / Prompt Class**: assign once; later tutorials create them.
 
-> Pad overrides follow the controller, not the platform: a Switch Pro Controller on PC gets the Nintendo entries. Before a player touches a pad, and for pads with no device mapping, the platform's own family applies (Xbox on desktop).
+> Pad overrides follow the controller, not the platform: a Switch Pro Controller on PC gets the Nintendo entries. Each player starts on the pad the platform assigned to them when the input backend names the hardware on connection ([SDLGamepad](https://github.com/kirzo/SDLGamepad) does); otherwise the device is learned from the player's first input. For pads with no device mapping, the platform's own family applies (Xbox on desktop).
 
 ### 2. Your First Navigable Menu
 
