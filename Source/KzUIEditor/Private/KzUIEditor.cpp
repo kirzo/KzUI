@@ -1,6 +1,7 @@
 // Copyright 2026 kirzo
 
 #include "KzUIEditor.h"
+#include "KzUIEditorStyle.h"
 #include "Customization/KzSwitchOnOptionCustomization.h"
 #include "K2Node_SwitchOnKzOption.h"
 #include "KzUIFlipbook.h"
@@ -9,6 +10,8 @@
 
 void FKzUIEditorModule::OnStartupModule()
 {
+	FKzUIEditorStyle::Initialize();
+
 	RegisterClassLayout<UK2Node_SwitchOnKzOption, FKzSwitchOnOptionCustomization>();
 
 	RegisterAssetTypeAction<UKzUISoundTheme>(
@@ -28,6 +31,11 @@ void FKzUIEditorModule::OnStartupModule()
 		INVTEXT("UI Flipbook"),
 		FColor(64, 201, 255),
 		{ INVTEXT("UI") });
+}
+
+void FKzUIEditorModule::OnShutdownModule()
+{
+	FKzUIEditorStyle::Shutdown();
 }
 
 IMPLEMENT_MODULE(FKzUIEditorModule, KzUIEditor)

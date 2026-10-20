@@ -29,7 +29,8 @@ public class KzUIEditor : ModuleRules
 				"UnrealEd",
 				"AssetTools",
 				"PropertyEditor",
-				"ComponentVisualizers"
+				"ComponentVisualizers",
+				"Projects"
 			}
 			);
 	}

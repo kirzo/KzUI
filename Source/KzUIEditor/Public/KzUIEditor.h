@@ -8,4 +8,5 @@ class FKzUIEditorModule : public FKzLibEditorModule_Base
 {
 protected:
 	virtual void OnStartupModule() override;
+	virtual void OnShutdownModule() override;
 };
