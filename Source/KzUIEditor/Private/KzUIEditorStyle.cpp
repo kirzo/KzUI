@@ -20,4 +20,14 @@ FKzUIEditorStyle::FKzUIEditorStyle()
 		Set(*FString::Printf(TEXT("ClassIcon.%s"), Class.Key), new FSlateVectorImageBrush(RootToContentDir(FString(TEXT("Icons/")) + Class.Value, TEXT(".svg")), FVector2D(16.0f, 16.0f)));
 		Set(*FString::Printf(TEXT("ClassThumbnail.%s"), Class.Key), new FSlateVectorImageBrush(RootToContentDir(FString(TEXT("Icons/")) + Class.Value + TEXT("Color"), TEXT(".svg")), FVector2D(64.0f, 64.0f)));
 	}
+
+	// UMG palette and hierarchy, in the engine's 16 px white style with the focus yellow; Widget Blueprints show the icon of their native parent in the hierarchy
+	const TCHAR* Widgets[] = {
+		TEXT("KzImage"), TEXT("KzInputIcon"), TEXT("KzTextBlock"), TEXT("KzWidgetSwitcher"), TEXT("KzSwitcherPage"), TEXT("KzSplashPage"),
+		TEXT("KzUserWidget"), TEXT("KzNavigableWidget"), TEXT("KzOptionWidget"), TEXT("KzSpinner"), TEXT("KzSlider"), TEXT("KzToggle"), TEXT("KzPromptWidget"), TEXT("KzSplashWidget")
+	};
+	for (const TCHAR* Widget : Widgets)
+	{
+		Set(*FString::Printf(TEXT("ClassIcon.%s"), Widget), new FSlateVectorImageBrush(RootToContentDir(FString(TEXT("Icons/Widgets/")) + Widget, TEXT(".svg")), FVector2D(16.0f, 16.0f)));
+	}
 }
