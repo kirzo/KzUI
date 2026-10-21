@@ -13,6 +13,7 @@
 #include "K2Node_CallFunction.h"
 #include "K2Node_IfThenElse.h"
 #include "KismetCompiler.h"
+#include "Styling/AppStyle.h"
 
 namespace
 {
@@ -46,6 +47,12 @@ FText UK2Node_SwitchOnKzOption::GetNodeTitle(ENodeTitleType::Type TitleType) con
 FText UK2Node_SwitchOnKzOption::GetTooltipText() const
 {
 	return INVTEXT("Routes the execution to the pin matching the given option widget. Pins are generated from the selectable widgets of this Blueprint and refresh on compile.");
+}
+
+FSlateIcon UK2Node_SwitchOnKzOption::GetIconAndTint(FLinearColor& OutColor) const
+{
+	OutColor = FLinearColor::White;
+	return FSlateIcon(FAppStyle::GetAppStyleSetName(), "GraphEditor.Switch_16x");
 }
 
 bool UK2Node_SwitchOnKzOption::IsCompatibleWithGraph(const UEdGraph* TargetGraph) const
