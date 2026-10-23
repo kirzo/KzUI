@@ -47,7 +47,7 @@ public:
 	UPROPERTY(Category = "KzUI|Input", EditAnywhere, meta = (Bitmask, BitmaskEnum = "/Script/KzUI.EKzUIInputType"))
 	uint32 InputMask = 0;
 
-	/** Inputs whose Triggered event fires on every key event instead of once per press. */
+	/** Inputs whose Triggered event fires on every key event, repeats included, instead of once per press. They skip the pressed state: their trigger is ignored, Held never fires, a Chord cannot require them, and every key up fires Released even if its key down went elsewhere. */
 	UPROPERTY(Category = "KzUI|Input", EditAnywhere, meta = (Bitmask, BitmaskEnum = "/Script/KzUI.EKzUIInputType"))
 	uint32 ContinuousInputMask = 0;
 

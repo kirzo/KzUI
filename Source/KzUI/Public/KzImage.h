@@ -71,7 +71,7 @@ public:
 	UFUNCTION(Category = "KzUI|Image", BlueprintCallable)
 	void SetImage(UObject* Image);
 
-	/** Sets a scalar parameter on the brush's dynamic material, creating the instance on demand. Safe to call every update: it survives icon refreshes on device changes. */
+	/** Sets a scalar parameter on the brush's dynamic material, creating the instance on demand; does nothing on a texture or flipbook brush. A KzInputIcon variation keeps its instance across device changes, so the value survives there; any other new image starts from the material defaults. */
 	UFUNCTION(Category = "KzUI|Image", BlueprintCallable)
 	void SetMaterialScalarParameter(FName ParameterName, float Value);
 
