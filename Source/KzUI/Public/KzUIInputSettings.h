@@ -31,6 +31,7 @@ public:
 	/** Keys of Input for a player on the given pad family, resolved once per family. */
 	const FKzUIInputDefinition* FindInputDefinition(EKzUIInputType Input, EKzUIInputDevice GamepadDevice) const;
 
+	virtual void PostInitProperties() override;
 	virtual void PostReloadConfig(FProperty* PropertyThatWasLoaded) override;
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -63,6 +64,8 @@ public:
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
 
 private:
+	void AddMissingInputs();
+
 	/** InputMap resolved per pad family, built on first use and dropped when the settings change. */
 	mutable TMap<EKzUIInputDevice, TMap<EKzUIInputType, FKzUIInputDefinition>> ResolvedInputs;
 };
