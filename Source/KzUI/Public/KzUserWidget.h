@@ -109,6 +109,7 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 public:
+	virtual bool Initialize() override;
 	virtual void RemoveFromParent() override;
 	//~ End UUserWidget Interface
 
@@ -121,7 +122,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "On Remove From Parent"))
 	void ReceiveOnRemoveFromParent();
 
-	/** Removes this widget; with bPropagate, parents in the dynamic-child chain remove themselves too. */
+	/** Removes this widget; with bPropagate, parents in the dynamic-child chain remove themselves too. A KzWidgetSwitcher page goes back instead, and with bPropagate removes the screen hosting the switcher. */
 	UFUNCTION(Category = "KzUI", BlueprintCallable)
 	void RemoveFromStack(bool bPropagate = false);
 
@@ -164,6 +165,9 @@ public:
 
 	/** Whether SetInputEnabled switched the input on and no modal child covers the widget. Widgets that do not only get the focus when no other widget wants it. */
 	bool WantsFocus() const { return bInputEnabled && !ChildWidget; }
+
+	/** Whether SetInputEnabled switched the input on, whatever else blocks it right now. */
+	bool IsInputSwitchedOn() const { return bInputEnabled; }
 
 	/** Resets runtime input state, firing Released for the in-flight presses so their pending feedback can be undone. */
 	void ClearInput();

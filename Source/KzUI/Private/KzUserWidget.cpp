@@ -12,22 +12,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 
-/** Nearest ancestor KzWidgetSwitcher within the same widget tree, reporting whether Widget sits on its active page. */
-static UKzWidgetSwitcher* FindOwningSwitcher(const UWidget* Widget, bool& bOutOnActivePage)
-{
-	bOutOnActivePage = true;
-	const UWidget* Child = Widget;
-	for (UWidget* Parent = Widget->GetParent(); Parent; Child = Parent, Parent = Parent->GetParent())
-	{
-		if (UKzWidgetSwitcher* Switcher = Cast<UKzWidgetSwitcher>(Parent))
-		{
-			bOutOnActivePage = Switcher->GetActiveWidget() == Child;
-			return Switcher;
-		}
-	}
-	return nullptr;
-}
-
 #define ADD_INPUT_CALLBACKS(Type) \
 	CanHandleInputFunc.Add(EKzUIInputType::Type, [this]() { return CanHandle##Type##Input(); }); \
 	InputTriggered.Add(EKzUIInputType::Type, [this](bool bHandled) { Type##InputTriggered(bHandled); }); \
@@ -61,6 +45,34 @@ UKzUserWidget::UKzUserWidget(const FObjectInitializer& ObjectInitializer)
 
 #undef ADD_INPUT_CALLBACKS
 
+bool UKzUserWidget::Initialize()
+{
+	if (!Super::Initialize())
+	{
+		return false;
+	}
+
+	// Named slots with default content are not registered as slot content, so WidgetTree->ForEachWidget
+	// misses them (see UUserWidget::GetContentForSlot). Done before any Slate exists: re-parenting
+	// constructed content would destruct and construct it again
+	if (!IsDesignTime())
+	{
+		TArray<FName> SlotNames;
+		GetSlotNames(SlotNames);
+
+		for (FName SlotName : SlotNames)
+		{
+			UPanelWidget* AsPanel = Cast<UPanelWidget>(GetWidgetFromName(SlotName));
+			UWidget* Content = AsPanel ? AsPanel->GetChildAt(0) : nullptr;
+			if (Content && !GetContentForSlot(SlotName))
+			{
+				SetContentForSlot(SlotName, Content);
+			}
+		}
+	}
+	return true;
+}
+
 void UKzUserWidget::NativeConstruct()
 {
 	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
@@ -70,27 +82,9 @@ void UKzUserWidget::NativeConstruct()
 
 	SetInputEnabled(bStartWithInputEnabled);
 
-	// Named slots with default content are not registered as slot content, so WidgetTree->ForEachWidget
-	// misses them (see UUserWidget::GetContentForSlot). Register their first child explicitly.
-	{
-		TArray<FName> SlotNames;
-		GetSlotNames(SlotNames);
-
-		for (FName SlotName : SlotNames)
-		{
-			if (UPanelWidget* AsPanel = Cast<UPanelWidget>(GetWidgetFromName(SlotName)))
-			{
-				if (UWidget* Content = AsPanel->GetChildAt(0))
-				{
-					SetContentForSlot(SlotName, Content);
-				}
-			}
-		}
-	}
-
 	// Pages of a KzWidgetSwitcher register when the switcher activates them, not on construct
 	bool bOnActivePage = true;
-	FindOwningSwitcher(this, bOnActivePage);
+	UKzWidgetSwitcher::FindOwningSwitcher(this, bOnActivePage);
 	if (bOnActivePage)
 	{
 		if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
@@ -265,11 +259,17 @@ void UKzUserWidget::RemoveFromStack(bool bPropagate)
 	const bool bOnScreen = GetParent() || IsInViewport();
 	if (bOnScreen && !IsDesignTime() && !HasAnyFlags(RF_ClassDefaultObject | RF_BeginDestroyed))
 	{
-		// A switcher page closes by handing control back to the switcher, not by removing itself
+		// A switcher page closes by handing control back to the switcher, not by removing itself.
+		// Propagating, the chain goes on through the screen hosting the switcher
 		bool bOnActivePage = true;
-		if (UKzWidgetSwitcher* Switcher = FindOwningSwitcher(this, bOnActivePage))
+		if (UKzWidgetSwitcher* Switcher = UKzWidgetSwitcher::FindOwningSwitcher(this, bOnActivePage))
 		{
-			if (bOnActivePage)
+			UKzUserWidget* Screen = bPropagate ? Switcher->GetOwningScreen() : nullptr;
+			if (Screen)
+			{
+				Screen->RemoveFromStack(true);
+			}
+			else if (bOnActivePage)
 			{
 				Switcher->GoBack();
 			}

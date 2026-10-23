@@ -6,6 +6,7 @@
 #include "KzUIInputSubsystem.h"
 #include "KzUserWidget.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Containers/Ticker.h"
 
 void UKzWidgetSwitcher::SetActiveWidgetIndex(int32 Index)
@@ -72,7 +73,7 @@ void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 
 	UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer());
 
-	if (UKzUserWidget* OldPage = GetPageScreen(GetWidgetAtIndex(PreviousIndex)))
+	for (UKzUserWidget* OldPage : GetPageScreens(GetWidgetAtIndex(PreviousIndex)))
 	{
 		OldPage->ClearInput();
 		if (Subsystem)
@@ -81,8 +82,8 @@ void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 		}
 	}
 
-	UKzUserWidget* NewPage = GetPageScreen(GetActiveWidget());
-	if (NewPage)
+	const TArray<UKzUserWidget*> NewPages = GetPageScreens(GetActiveWidget());
+	for (UKzUserWidget* NewPage : NewPages)
 	{
 		if (Subsystem)
 		{
@@ -95,12 +96,16 @@ void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 	// the page does not handle would bubble into the screen's own navigation
 	if (UKzUserWidget* Screen = GetOwningScreen())
 	{
-		if (NewPage && !bOwnerInputDisabledBySwitcher)
+		if (NewPages.Num() > 0 && !bOwnerInputDisabledBySwitcher)
 		{
-			Screen->SetInputEnabled(false);
-			bOwnerInputDisabledBySwitcher = true;
+			// A screen whose input was already off is left alone, so leaving the page does not switch it on
+			if (Screen->IsInputSwitchedOn())
+			{
+				Screen->SetInputEnabled(false);
+				bOwnerInputDisabledBySwitcher = true;
+			}
 		}
-		else if (!NewPage && bOwnerInputDisabledBySwitcher)
+		else if (NewPages.IsEmpty() && bOwnerInputDisabledBySwitcher)
 		{
 			Screen->SetInputEnabled(true);
 			bOwnerInputDisabledBySwitcher = false;
@@ -121,11 +126,39 @@ UKzUserWidget* UKzWidgetSwitcher::GetOwningScreen() const
 	return GetTypedOuter<UKzUserWidget>();
 }
 
-UKzUserWidget* UKzWidgetSwitcher::GetPageScreen(UWidget* Page)
+UKzWidgetSwitcher* UKzWidgetSwitcher::FindOwningSwitcher(const UWidget* Widget, bool& bOutOnActivePage)
 {
-	if (UKzSwitcherPage* Wrapper = Cast<UKzSwitcherPage>(Page))
+	bOutOnActivePage = true;
+	const UWidget* Child = Widget;
+	for (UWidget* Parent = Widget->GetParent(); Parent; Child = Parent, Parent = Parent->GetParent())
 	{
-		return Cast<UKzUserWidget>(Wrapper->GetContent());
+		if (UKzWidgetSwitcher* Switcher = Cast<UKzWidgetSwitcher>(Parent))
+		{
+			bOutOnActivePage = Switcher->GetActiveWidget() == Child;
+			return Switcher;
+		}
 	}
-	return Cast<UKzUserWidget>(Page);
+	return nullptr;
+}
+
+TArray<UKzUserWidget*> UKzWidgetSwitcher::GetPageScreens(UWidget* Page) const
+{
+	TArray<UKzUserWidget*> Screens;
+	auto AddScreen = [this, &Screens](UWidget* Widget)
+		{
+			// The ones under a nested switcher belong to it
+			bool bOnActivePage = true;
+			UKzUserWidget* Screen = Cast<UKzUserWidget>(Widget);
+			if (Screen && FindOwningSwitcher(Screen, bOnActivePage) == this)
+			{
+				Screens.Add(Screen);
+			}
+		};
+
+	if (Page)
+	{
+		AddScreen(Page);
+		UWidgetTree::ForWidgetAndChildren(Page, AddScreen);
+	}
+	return Screens;
 }

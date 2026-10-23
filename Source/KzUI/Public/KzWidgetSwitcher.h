@@ -12,11 +12,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FKzActivePageChangedSignature, in
 /**
  * Widget switcher whose pages plug into the KzUI input model. Pages are ideally UKzSwitcherPage
  * containers, which carry the page title. Plain content belongs to the owning screen, which keeps
- * handling the input; a KzUserWidget page (direct child or KzSwitcherPage content) is registered
- * on the player's widget stack while active, taking focus and suspending the owning screen, and
- * its RemoveFromStack returns the switcher to the previous page instead of removing it, so the
- * same widget works as a screen or as a page. The default page should be plain content: a
- * KzUserWidget page active from construction is not managed.
+ * handling the input; the KzUserWidgets of a page (at any depth of this widget tree, nested
+ * switchers aside) are registered on the player's widget stack while it is active, taking focus
+ * and suspending the owning screen, and their RemoveFromStack returns the switcher to the previous
+ * page instead of removing them, so the same widget works as a screen or as a page. The default
+ * page should be plain content: a KzUserWidget page active from construction is not managed.
  */
 UCLASS(meta = (PrioritizeCategories = "KzUI"))
 class KZUI_API UKzWidgetSwitcher : public UWidgetSwitcher
@@ -48,14 +48,17 @@ public:
 	UFUNCTION(Category = "KzUI|Switcher", BlueprintPure)
 	FText GetActivePageTitle() const;
 
-private:
-	void HandleActivePageChanged(int32 PreviousIndex);
-
 	/** Nearest KzUserWidget up the outer chain: the screen hosting this switcher. */
 	UKzUserWidget* GetOwningScreen() const;
 
-	/** The KzUserWidget a page brings in: the page itself or the content of its KzSwitcherPage wrapper. */
-	static UKzUserWidget* GetPageScreen(UWidget* Page);
+	/** Nearest ancestor KzWidgetSwitcher within the same widget tree, reporting whether Widget sits on its active page. */
+	static UKzWidgetSwitcher* FindOwningSwitcher(const UWidget* Widget, bool& bOutOnActivePage);
+
+private:
+	void HandleActivePageChanged(int32 PreviousIndex);
+
+	/** The KzUserWidgets this switcher manages on a page. */
+	TArray<UKzUserWidget*> GetPageScreens(UWidget* Page) const;
 
 	TArray<int32> PageHistory;
 
