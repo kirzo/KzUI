@@ -6,7 +6,7 @@
 #include "KzSelectableWidgetInterface.h"
 #include "KzUIFunctionLibrary.h"
 
-#include "Blueprint/WidgetBlueprintGeneratedClass.h"
+#include "BaseWidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "BlueprintActionDatabaseRegistrar.h"
 #include "BlueprintNodeSpawner.h"
@@ -19,6 +19,14 @@ namespace
 {
 	const FName OptionPinName(TEXT("Option"));
 	const FName DefaultPinName(TEXT("Default"));
+
+	/** Hover-only rows (spinner, slider, toggle) never reach OnOptionAccepted, so they get no pin. */
+	bool IsAcceptableOption(UWidget* Widget)
+	{
+		return Widget->Implements<UKzSelectableWidgetInterface>()
+			&& IKzSelectableWidgetInterface::Execute_IsSelectable(Widget)
+			&& IKzSelectableWidgetInterface::Execute_CanBeSelected(Widget);
+	}
 }
 
 void UK2Node_SwitchOnKzOption::AllocateDefaultPins()
@@ -46,7 +54,7 @@ FText UK2Node_SwitchOnKzOption::GetNodeTitle(ENodeTitleType::Type TitleType) con
 
 FText UK2Node_SwitchOnKzOption::GetTooltipText() const
 {
-	return INVTEXT("Routes the execution to the pin matching the given option widget. Pins are generated from the selectable widgets of this Blueprint and refresh on compile.");
+	return INVTEXT("Routes the execution to the pin matching the given option widget. Pins are generated from the selectable widgets of this Blueprint and refresh before every compile.");
 }
 
 FSlateIcon UK2Node_SwitchOnKzOption::GetIconAndTint(FLinearColor& OutColor) const
@@ -64,6 +72,31 @@ bool UK2Node_SwitchOnKzOption::IsCompatibleWithGraph(const UEdGraph* TargetGraph
 
 	const UBlueprint* Blueprint = TargetGraph ? TargetGraph->GetTypedOuter<UBlueprint>() : nullptr;
 	return Blueprint && Blueprint->ParentClass && Blueprint->ParentClass->IsChildOf(UKzNavigableWidget::StaticClass());
+}
+
+void UK2Node_SwitchOnKzOption::ValidateNodeDuringCompilation(FCompilerResultsLog& MessageLog) const
+{
+	Super::ValidateNodeDuringCompilation(MessageLog);
+
+	// Placement checks the parent class only once, and a Blueprint can be reparented later
+	const UBlueprint* Blueprint = GetBlueprint();
+	if (!Blueprint || !Blueprint->ParentClass || !Blueprint->ParentClass->IsChildOf(UKzNavigableWidget::StaticClass()))
+	{
+		MessageLog.Warning(TEXT("@@ only works in a Kz Navigable Widget Blueprint."), this);
+	}
+
+	const UEdGraphPin* OptionPin = FindPin(OptionPinName, EGPD_Input);
+	if (OptionPin && OptionPin->LinkedTo.Num() == 0)
+	{
+		MessageLog.Warning(TEXT("@@ has no Option connected, so it always takes Default."), this);
+	}
+
+	TArray<FName> Names;
+	bool bSkippedDefault = false;
+	if (CollectOptionNames(Names, &bSkippedDefault) && bSkippedDefault)
+	{
+		MessageLog.Warning(TEXT("@@ cannot give a pin to the option named Default, which would take the Default pin's place: rename the widget."), this);
+	}
 }
 
 void UK2Node_SwitchOnKzOption::GetMenuActions(FBlueprintActionDatabaseRegistrar& ActionRegistrar) const
@@ -149,26 +182,73 @@ TArray<FName> UK2Node_SwitchOnKzOption::GetOptionNames() const
 	return CachedOptionNames;
 }
 
+bool UK2Node_SwitchOnKzOption::RefreshOptions()
+{
+	TArray<FName> Names;
+	if (!CollectOptionNames(Names) || Names == CachedOptionNames)
+	{
+		return false;
+	}
+	ReconstructNode();
+	return true;
+}
+
 void UK2Node_SwitchOnKzOption::RefreshCachedOptionNames()
 {
-	const UBlueprint* Blueprint = GetBlueprint();
-	UClass* GeneratedClass = Blueprint ? *Blueprint->GeneratedClass : nullptr;
-	const UWidgetBlueprintGeneratedClass* WidgetClass = Cast<UWidgetBlueprintGeneratedClass>(GeneratedClass);
-	const UWidgetTree* Tree = WidgetClass ? WidgetClass->GetWidgetTreeArchetype() : nullptr;
-
-	// An absent or rootless tree means the class is mid-load or mid-compile: keep the serialized names
-	if (!Tree || !Tree->RootWidget)
+	// Without the trees (the Blueprint is loading) the serialized names stand
+	TArray<FName> Names;
+	if (CollectOptionNames(Names))
 	{
-		return;
+		CachedOptionNames = MoveTemp(Names);
+		DisabledOptions.RemoveAll([this](const FName Name) { return !CachedOptionNames.Contains(Name); });
+	}
+}
+
+bool UK2Node_SwitchOnKzOption::CollectOptionNames(TArray<FName>& OutNames, bool* bOutSkippedDefault) const
+{
+	// The source trees and not the generated class, whose tree only changes at the end of a compile: designer
+	// edits show right away. Nothing is read while loading, when Blueprint events must not run on templates.
+	const UBaseWidgetBlueprint* Blueprint = Cast<UBaseWidgetBlueprint>(GetBlueprint());
+	if (!Blueprint || Blueprint->bIsRegeneratingOnLoad)
+	{
+		return false;
 	}
 
-	CachedOptionNames.Reset();
-	Tree->ForEachWidget([this](UWidget* Widget)
+	// A child Widget Blueprint draws the tree of the nearest parent that has one and only fills its named slots
+	const UWidgetTree* RootTree = nullptr;
+	for (const UBaseWidgetBlueprint* Current = Blueprint; Current && !RootTree; Current = Cast<UBaseWidgetBlueprint>(UBlueprint::GetBlueprintFromClass(Current->ParentClass)))
+	{
+		if (Current->WidgetTree && Current->WidgetTree->RootWidget)
 		{
-			if (Widget->Implements<UKzSelectableWidgetInterface>() && IKzSelectableWidgetInterface::Execute_IsSelectable(Widget))
-			{
-				CachedOptionNames.Add(Widget->GetFName());
-			}
+			RootTree = Current->WidgetTree;
 		}
-	);
+	}
+	if (!RootTree)
+	{
+		return false;
+	}
+
+	OutNames.Reset();
+	auto AddOption = [&OutNames, bOutSkippedDefault](UWidget* Widget)
+		{
+			if (!IsAcceptableOption(Widget))
+			{
+				return;
+			}
+			if (Widget->GetFName() == DefaultPinName)
+			{
+				if (bOutSkippedDefault)
+				{
+					*bOutSkippedDefault = true;
+				}
+				return;
+			}
+			OutNames.AddUnique(Widget->GetFName());
+		};
+	RootTree->ForEachWidget(AddOption);
+	if (Blueprint->WidgetTree && Blueprint->WidgetTree != RootTree)
+	{
+		Blueprint->WidgetTree->ForEachWidget(AddOption);
+	}
+	return true;
 }

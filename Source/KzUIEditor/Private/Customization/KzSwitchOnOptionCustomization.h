@@ -12,4 +12,9 @@ public:
 	static TSharedRef<IDetailCustomization> MakeInstance();
 
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailBuilder) override;
+	virtual void CustomizeDetails(const TSharedPtr<IDetailLayoutBuilder>& DetailBuilder) override;
+
+private:
+	/** Rebuilt after a toggle: reconstructing the node may have read a changed widget tree. */
+	TWeakPtr<IDetailLayoutBuilder> LayoutBuilder;
 };

@@ -17,6 +17,12 @@ TSharedRef<IDetailCustomization> FKzSwitchOnOptionCustomization::MakeInstance()
 	return MakeShared<FKzSwitchOnOptionCustomization>();
 }
 
+void FKzSwitchOnOptionCustomization::CustomizeDetails(const TSharedPtr<IDetailLayoutBuilder>& DetailBuilder)
+{
+	LayoutBuilder = DetailBuilder;
+	CustomizeDetails(*DetailBuilder);
+}
+
 void FKzSwitchOnOptionCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 {
 	TArray<TWeakObjectPtr<UObject>> Objects;
@@ -34,6 +40,20 @@ void FKzSwitchOnOptionCustomization::CustomizeDetails(IDetailLayoutBuilder& Deta
 
 	IDetailCategoryBuilder& Category = DetailBuilder.EditCategory("Options", INVTEXT("Options"));
 	const TWeakObjectPtr<UK2Node_SwitchOnKzOption> WeakNode = Node;
+	const TWeakPtr<IDetailLayoutBuilder> WeakLayout = LayoutBuilder;
+
+	if (Node->GetOptionNames().IsEmpty())
+	{
+		Category.AddCustomRow(INVTEXT("No options"))
+		.WholeRowContent()
+		[
+			SNew(STextBlock)
+			.Text(INVTEXT("No selectable widgets found. Options are the widgets of this Blueprint that are selectable and can be accepted."))
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+			.AutoWrapText(true)
+		];
+		return;
+	}
 
 	for (const FName OptionName : Node->GetOptionNames())
 	{
@@ -53,7 +73,7 @@ void FKzSwitchOnOptionCustomization::CustomizeDetails(IDetailLayoutBuilder& Deta
 					return Node && !Node->DisabledOptions.Contains(OptionName) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 				}
 			)
-			.OnCheckStateChanged_Lambda([WeakNode, OptionName](ECheckBoxState State)
+			.OnCheckStateChanged_Lambda([WeakNode, WeakLayout, OptionName](ECheckBoxState State)
 				{
 					UK2Node_SwitchOnKzOption* Node = WeakNode.Get();
 					if (!Node)
@@ -62,6 +82,7 @@ void FKzSwitchOnOptionCustomization::CustomizeDetails(IDetailLayoutBuilder& Deta
 					}
 
 					const FScopedTransaction Transaction(INVTEXT("Toggle Switch Option Pin"));
+					const TArray<FName> OptionsBefore = Node->GetOptionNames();
 					Node->Modify();
 					if (State == ECheckBoxState::Checked)
 					{
@@ -73,6 +94,13 @@ void FKzSwitchOnOptionCustomization::CustomizeDetails(IDetailLayoutBuilder& Deta
 					}
 					Node->ReconstructNode();
 					FBlueprintEditorUtils::MarkBlueprintAsModified(Node->GetBlueprint());
+
+					// Reconstructing reads the widget tree again, which may have changed since the rows were built
+					const TSharedPtr<IDetailLayoutBuilder> Layout = WeakLayout.Pin();
+					if (Layout && Node->GetOptionNames() != OptionsBefore)
+					{
+						Layout->ForceRefreshDetails();
+					}
 				}
 			)
 		];

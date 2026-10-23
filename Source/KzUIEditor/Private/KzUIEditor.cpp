@@ -8,11 +8,30 @@
 #include "KzUIIconTheme.h"
 #include "KzUISoundTheme.h"
 
+#include "Editor.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+
+/** Switch on Option pins follow the widget tree, which the compiler never asks about: refreshed here, a renamed option with links fails to compile instead of falling through to Default. */
+static void RefreshSwitchOnOptionNodes(UBlueprint* Blueprint)
+{
+	TArray<UK2Node_SwitchOnKzOption*> Nodes;
+	FBlueprintEditorUtils::GetAllNodesOfClass(Blueprint, Nodes);
+	for (UK2Node_SwitchOnKzOption* Node : Nodes)
+	{
+		Node->RefreshOptions();
+	}
+}
+
 void FKzUIEditorModule::OnStartupModule()
 {
 	FKzUIEditorStyle::Initialize();
 
 	RegisterClassLayout<UK2Node_SwitchOnKzOption, FKzSwitchOnOptionCustomization>();
+
+	if (GEditor)
+	{
+		BlueprintPreCompileHandle = GEditor->OnBlueprintPreCompile().AddStatic(&RefreshSwitchOnOptionNodes);
+	}
 
 	RegisterAssetTypeAction<UKzUISoundTheme>(
 		KzAssetCategoryBit,
@@ -35,6 +54,10 @@ void FKzUIEditorModule::OnStartupModule()
 
 void FKzUIEditorModule::OnShutdownModule()
 {
+	if (GEditor)
+	{
+		GEditor->OnBlueprintPreCompile().Remove(BlueprintPreCompileHandle);
+	}
 	FKzUIEditorStyle::Shutdown();
 }
 

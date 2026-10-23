@@ -8,8 +8,9 @@
 
 /**
  * Switch with one exec pin per option of the owning KzNavigableWidget Blueprint, enumerated
- * from its widget tree (selectable widgets, tree order). Pins refresh when the Blueprint
- * compiles; the comparison is baked against the current widget names on every compile.
+ * from its source widget tree (selectable and acceptable widgets, tree order). The editor module
+ * refreshes the pins before every compile, so a renamed option with links fails to compile
+ * instead of silently falling through to Default.
  */
 UCLASS()
 class KZUIUNCOOKED_API UK2Node_SwitchOnKzOption : public UK2Node
@@ -23,6 +24,7 @@ public:
 	virtual FText GetTooltipText() const override;
 	virtual FSlateIcon GetIconAndTint(FLinearColor& OutColor) const override;
 	virtual bool IsCompatibleWithGraph(const UEdGraph* TargetGraph) const override;
+	virtual void ValidateNodeDuringCompilation(class FCompilerResultsLog& MessageLog) const override;
 	//~ End UEdGraphNode Interface
 
 	//~ Begin UK2Node Interface
@@ -34,12 +36,18 @@ public:
 
 	TArray<FName> GetOptionNames() const;
 
+	/** Reads the options from the widget tree again and rebuilds the pins if they changed. Returns whether they did. */
+	bool RefreshOptions();
+
 	/** Options toggled off in the details panel: no pin is generated, so they fall through to Default. */
 	UPROPERTY()
 	TArray<FName> DisabledOptions;
 
 private:
 	void RefreshCachedOptionNames();
+
+	/** Option names from the source widget trees. False while the trees are unavailable (the Blueprint is loading). */
+	bool CollectOptionNames(TArray<FName>& OutNames, bool* bOutSkippedDefault = nullptr) const;
 
 	/** Last successfully enumerated option names. Pins are built from these so reconstruction while the widget tree is unavailable (e.g. during editor startup) does not wipe them. */
 	UPROPERTY()
