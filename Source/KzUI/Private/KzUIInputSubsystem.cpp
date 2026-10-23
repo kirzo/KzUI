@@ -15,6 +15,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
@@ -54,6 +55,23 @@ UKzUIInputSubsystem* UKzUIInputSubsystem::FindForSlateUser(int32 UserIndex)
 		}
 	}
 	return nullptr;
+}
+
+UKzUIInputSubsystem* UKzUIInputSubsystem::GetForWidget(const UWidget* Widget)
+{
+	if (!Widget)
+	{
+		return nullptr;
+	}
+
+	const ULocalPlayer* LocalPlayer = Widget->GetOwningLocalPlayer();
+	if (!LocalPlayer)
+	{
+		const UWorld* World = Widget->GetWorld();
+		const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+		LocalPlayer = GameInstance ? GameInstance->GetFirstGamePlayer() : nullptr;
+	}
+	return Get(LocalPlayer);
 }
 
 EKzUIInputDevice UKzUIInputSubsystem::GetPlatformGamepadDevice()

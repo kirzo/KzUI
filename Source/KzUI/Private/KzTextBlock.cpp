@@ -9,6 +9,10 @@
 
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Internationalization/BreakIterator.h"
+#include "Internationalization/TextLocalizationManager.h"
+#include "Styling/CoreStyle.h"
+#include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -32,13 +36,17 @@ void UKzTextBlock::SetStyle(TSubclassOf<UKzTextBlockStyle> NewStyle)
 {
 	Style = NewStyle;
 	ApplyStyle();
-	RebuildContent();
 }
 
 void UKzTextBlock::SetText(FText InText)
 {
 	Super::SetText(InText);
-	RebuildContent();
+
+	// The text it already shows rebuilds nothing, so icon handles and their materials survive
+	if (GetText().ToString() != BuiltSource)
+	{
+		RebuildContent();
+	}
 }
 
 void UKzTextBlock::SetIsEnabled(bool bInIsEnabled)
@@ -49,7 +57,6 @@ void UKzTextBlock::SetIsEnabled(bool bInIsEnabled)
 	if (bChanged)
 	{
 		ApplyStyle();
-		RebuildContent();
 	}
 }
 
@@ -57,34 +64,48 @@ void UKzTextBlock::OnSelect_Implementation()
 {
 	bSelected = true;
 	ApplyStyle();
-	RebuildContent();
 }
 
 void UKzTextBlock::OnDeselect_Implementation()
 {
 	bSelected = false;
 	ApplyStyle();
-	RebuildContent();
 }
 
 void UKzTextBlock::OnHovered_Implementation()
 {
 	bHovered = true;
 	ApplyStyle();
-	RebuildContent();
 }
 
 void UKzTextBlock::OnUnhovered_Implementation()
 {
 	bHovered = false;
 	ApplyStyle();
-	RebuildContent();
 }
 
 void UKzTextBlock::SynchronizeProperties()
 {
 	ApplyStyle();
 	Super::SynchronizeProperties();
+	RebuildContent();
+}
+
+void UKzTextBlock::OnJustificationChanged(ETextJustify::Type InJustification)
+{
+	Super::OnJustificationChanged(InJustification);
+	RebuildContent();
+}
+
+void UKzTextBlock::OnAutoWrapTextChanged(bool InAutoWrapText)
+{
+	Super::OnAutoWrapTextChanged(InAutoWrapText);
+	RebuildContent();
+}
+
+void UKzTextBlock::OnWrapTextAtChanged(float InWrapTextAt)
+{
+	Super::OnWrapTextAtChanged(InWrapTextAt);
 	RebuildContent();
 }
 
@@ -140,6 +161,10 @@ void UKzTextBlock::ReleaseSlateResources(bool bReleaseChildren)
 {
 	Super::ReleaseSlateResources(bReleaseChildren);
 	MyBox.Reset();
+	BuiltSource.Reset();
+
+	FTextLocalizationManager::Get().OnTextRevisionChangedEvent.Remove(TextRevisionHandle);
+	TextRevisionHandle.Reset();
 
 	for (UKzInputIcon* Icon : GeneratedIcons)
 	{
@@ -188,8 +213,27 @@ const UKzUIIconTheme* UKzTextBlock::GetActiveIconTheme() const
 		return UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
 	}
 #endif
-	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer());
-	return Subsystem ? Subsystem->GetIconTheme() : nullptr;
+	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::GetForWidget(this);
+	return Subsystem ? Subsystem->GetIconTheme() : UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+}
+
+float UKzTextBlock::GetLineHeight() const
+{
+	return FSlateApplication::IsInitialized() ? FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->GetMaxCharacterHeight(GetFont()) : 0.0f;
+}
+
+void UKzTextBlock::OnInputDeviceChanged(EKzUIInputDevice InputDevice)
+{
+	if (GetActiveIconTheme() != BuiltTheme.Get())
+	{
+		RebuildContent();
+	}
+}
+
+void UKzTextBlock::OnTextRevisionChanged()
+{
+	// The words are baked strings, so a new culture needs a new build
+	RebuildContent();
 }
 
 #if WITH_EDITOR
@@ -205,8 +249,19 @@ TSharedRef<SWidget> UKzTextBlock::RebuildWidget()
 	// containers settle unwrapped instead of feeding the default 100px preferred width back
 	// into their own size. When auto-wrapping, the allotted width takes over from there.
 	MyBox = SNew(SWrapBox).UseAllottedSize(GetAutoWrapText()).PreferredSize(KzNoWrapSize);
-	RebuildContent();
-	return MyBox.ToSharedRef();
+
+	if (!TextRevisionHandle.IsValid())
+	{
+		TextRevisionHandle = FTextLocalizationManager::Get().OnTextRevisionChangedEvent.AddUObject(this, &UKzTextBlock::OnTextRevisionChanged);
+	}
+
+	// The content is built by SynchronizeProperties, which TakeWidget calls right after this
+	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
+	return SNew(SBox)
+		.Padding_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->Margin : FMargin(); })
+		[
+			MyBox.ToSharedRef()
+		];
 }
 
 void UKzTextBlock::RebuildContent()
@@ -228,14 +283,55 @@ void UKzTextBlock::RebuildContent()
 
 	MyBox->ClearChildren();
 	GeneratedIcons.Reset();
+	bNextOnNewLine = false;
+	bHasSlots = false;
+
+	// Custom tokens are recognized against the theme, so a theme swap must rebuild
+	if (!IsDesignTime())
+	{
+		UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::GetForWidget(this);
+		if (Subsystem != BoundSubsystem.Get())
+		{
+			if (UKzUIInputSubsystem* Previous = BoundSubsystem.Get())
+			{
+				Previous->OnInputDeviceChanged.RemoveDynamic(this, &UKzTextBlock::OnInputDeviceChanged);
+			}
+			if (Subsystem)
+			{
+				Subsystem->OnInputDeviceChanged.AddUniqueDynamic(this, &UKzTextBlock::OnInputDeviceChanged);
+			}
+			BoundSubsystem = Subsystem;
+		}
+	}
 
 	const UKzUIIconTheme* Theme = GetActiveIconTheme();
+	BuiltTheme = Theme;
+
 	const bool bLeadingSpaces = Justification == ETextJustify::Right;
 	const FString Source = GetText().ToString();
+	BuiltSource = Source;
 	FString Pending;
 
 	for (int32 i = 0; i < Source.Len(); ++i)
 	{
+		if (Source[i] == TEXT('\r'))
+		{
+			continue;
+		}
+
+		if (Source[i] == TEXT('\n'))
+		{
+			AddTextSegment(Pending);
+
+			// A paragraph with nothing in it still takes its line
+			if (bNextOnNewLine)
+			{
+				AddTextBlock(FString());
+			}
+			bNextOnNewLine = true;
+			continue;
+		}
+
 		if (Source[i] == TEXT('{'))
 		{
 			const int32 End = Source.Find(TEXT("}"), ESearchCase::CaseSensitive, ESearchDir::FromStart, i + 1);
@@ -292,6 +388,20 @@ void UKzTextBlock::RebuildContent()
 		Pending.AppendChar(Source[i]);
 	}
 	AddTextSegment(Pending);
+
+	// Empty text and a trailing line break still take a line, like a plain TextBlock
+	if (!bHasSlots || bNextOnNewLine)
+	{
+		AddTextBlock(FString());
+	}
+}
+
+bool UKzTextBlock::TakeNewLine()
+{
+	const bool bNewLine = bNextOnNewLine;
+	bNextOnNewLine = false;
+	bHasSlots = true;
+	return bNewLine;
 }
 
 void UKzTextBlock::AddTextSegment(FString& Pending)
@@ -308,52 +418,65 @@ void UKzTextBlock::AddTextSegment(FString& Pending)
 		return;
 	}
 
-	// One block per word so the wrap can break between words. Spaces attach to the side of the
-	// ragged edge, where leftovers are invisible: trailing for left/center, leading for right.
-	const bool bLeadingSpaces = Justification == ETextJustify::Right;
-	int32 Start = 0;
-	while (Start < Pending.Len())
+	// One block per break opportunity of the engine's line breaker, so the wrap can break there; languages
+	// written without spaces break between characters. Each piece carries its trailing spaces.
+	if (!LineBreaker.IsValid())
 	{
-		int32 End = Start;
-		if (bLeadingSpaces)
+		LineBreaker = FBreakIterator::CreateLineBreakIterator();
+	}
+	TArray<FString> Pieces;
+	LineBreaker->SetString(Pending);
+	LineBreaker->ResetToBeginning();
+	int32 Start = 0;
+	for (int32 Break = LineBreaker->MoveToNext(); Break != INDEX_NONE; Break = LineBreaker->MoveToNext())
+	{
+		if (Break > Start)
 		{
-			while (End < Pending.Len() && Pending[End] == TEXT(' '))
-			{
-				++End;
-			}
-			while (End < Pending.Len() && Pending[End] != TEXT(' '))
-			{
-				++End;
-			}
+			Pieces.Add(Pending.Mid(Start, Break - Start));
+			Start = Break;
 		}
-		else
+	}
+	if (Start < Pending.Len())
+	{
+		Pieces.Add(Pending.Mid(Start));
+	}
+	LineBreaker->ClearString();
+
+	// Spaces go to the side of the ragged edge, where leftovers are invisible: leading for right justification
+	if (Justification == ETextJustify::Right)
+	{
+		for (int32 Index = 0; Index + 1 < Pieces.Num(); ++Index)
 		{
-			while (End < Pending.Len() && Pending[End] != TEXT(' '))
-			{
-				++End;
-			}
-			while (End < Pending.Len() && Pending[End] == TEXT(' '))
-			{
-				++End;
-			}
+			const FString Trimmed = Pieces[Index].TrimEnd();
+			Pieces[Index + 1] = Pieces[Index].RightChop(Trimmed.Len()) + Pieces[Index + 1];
+			Pieces[Index] = Trimmed;
 		}
-		AddTextBlock(Pending.Mid(Start, End - Start));
-		Start = End;
+	}
+
+	for (const FString& Piece : Pieces)
+	{
+		if (!Piece.IsEmpty())
+		{
+			AddTextBlock(Piece);
+		}
 	}
 	Pending.Reset();
 }
 
 void UKzTextBlock::AddTextBlock(const FString& Word)
 {
+	// Appearance is read live, so setters, styles and UMG animations apply without a rebuild
+	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
 	MyBox->AddSlot()
+	.ForceNewLine(TakeNewLine())
 	.VAlign(VAlign_Center)
 	[
 		SNew(STextBlock)
 		.Text(FText::FromString(Word))
-		.Font(GetFont())
-		.ColorAndOpacity(GetColorAndOpacity())
-		.ShadowOffset(GetShadowOffset())
-		.ShadowColorAndOpacity(GetShadowColorAndOpacity())
+		.Font_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetFont() : FSlateFontInfo(); })
+		.ColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetColorAndOpacity() : FSlateColor(); })
+		.ShadowOffset_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetShadowOffset() : FVector2D::ZeroVector; })
+		.ShadowColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetShadowColorAndOpacity() : FLinearColor::Transparent; })
 		.TransformPolicy(GetTextTransformPolicy())
 	];
 }
@@ -370,38 +493,62 @@ void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variat
 	Icon->CustomToken = CustomToken;
 	Icon->Variation = Variation;
 	Icon->SetInput(Input);
-	if (bApplyColorToIcons)
-	{
-		Icon->SetColorAndOpacity(GetColorAndOpacity().GetSpecifiedColor());
-	}
 	GeneratedIcons.Add(Icon);
 
-	FVector2D EffectiveIconSize = IconSize;
-	if (bAutoIconSize && FSlateApplication::IsInitialized())
-	{
-		const float LineHeight = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->GetMaxCharacterHeight(GetFont());
-		EffectiveIconSize = FVector2D(LineHeight, LineHeight);
-	}
-
+	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
+	const TWeakObjectPtr<UKzInputIcon> WeakIcon(Icon);
 	TSharedRef<SWidget> Content = Icon->TakeWidget();
-	if (EffectiveIconSize.X > 0.0 && EffectiveIconSize.Y > 0.0)
+
+	if (bAutoIconSize)
+	{
+		// The line height and the icon's own proportions, read live: a style with another font or a device
+		// with a wider icon (Space, LT+RT) resizes without a rebuild
+		Content = SNew(SBox)
+			.HeightOverride_Lambda([WeakThis]()
+				{
+					return FOptionalSize(WeakThis.IsValid() ? WeakThis->GetLineHeight() : 0.0f);
+				})
+			.WidthOverride_Lambda([WeakThis, WeakIcon]()
+				{
+					const float Height = WeakThis.IsValid() ? WeakThis->GetLineHeight() : 0.0f;
+					const FVector2D Natural = WeakIcon.IsValid() ? WeakIcon->GetNaturalSize() : FVector2D::ZeroVector;
+					return FOptionalSize(Natural.X > 0.0 && Natural.Y > 0.0 ? Height * float(Natural.X / Natural.Y) : Height);
+				})
+			[
+				Content
+			];
+	}
+	else if (IconSize.X > 0.0 && IconSize.Y > 0.0)
 	{
 		Content = SNew(SBox)
-			.WidthOverride(EffectiveIconSize.X)
-			.HeightOverride(EffectiveIconSize.Y)
+			.WidthOverride(IconSize.X)
+			.HeightOverride(IconSize.Y)
 			[
 				Content
 			];
 	}
 
-	float SpaceWidth = 0.0f;
-	if ((SpacesBefore > 0 || SpacesAfter > 0) && FSlateApplication::IsInitialized())
+	if (bApplyColorToIcons)
 	{
-		SpaceWidth = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT(" "), GetFont()).X;
+		Content = SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("NoBorder"))
+			.Padding(0.0f)
+			.ColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetColorAndOpacity().GetSpecifiedColor() : FLinearColor::White; })
+			[
+				Content
+			];
 	}
 
+	// Spaces become padding measured in the live font
 	MyBox->AddSlot()
-	.Padding(FMargin(SpaceWidth * SpacesBefore, 0.0f, SpaceWidth * SpacesAfter, 0.0f))
+	.ForceNewLine(TakeNewLine())
+	.Padding(TAttribute<FMargin>::CreateLambda([WeakThis, SpacesBefore, SpacesAfter]()
+		{
+			const float SpaceWidth = WeakThis.IsValid() && FSlateApplication::IsInitialized() && (SpacesBefore > 0 || SpacesAfter > 0)
+				? FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT(" "), WeakThis->GetFont()).X
+				: 0.0f;
+			return FMargin(SpaceWidth * SpacesBefore, 0.0f, SpaceWidth * SpacesAfter, 0.0f);
+		}))
 	.VAlign(VAlign_Center)
 	[
 		Content

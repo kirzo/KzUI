@@ -7,11 +7,13 @@
 #include "KzUITypes.h"
 #include "KzTextBlock.generated.h"
 
+class IBreakIterator;
 class SWrapBox;
 class UKzInputIcon;
 class UKzTextBlockStyle;
 class UKzTextStyle;
 class UKzUIIconTheme;
+class UKzUIInputSubsystem;
 
 /**
  * TextBlock with inline input icons: tokens like {Start} or {Accept} in the text are replaced
@@ -20,6 +22,7 @@ class UKzUIIconTheme;
  *
  * When a style set is assigned, it drives the inherited text appearance properties per widget
  * state (normal/hovered/selected/disabled); states arrive through IKzSelectableWidgetInterface.
+ * Font, colour and shadow are read live, so their setters and UMG animations apply without a rebuild.
  */
 UCLASS(meta = (PrioritizeCategories = "Style Icon Selection"))
 class KZUI_API UKzTextBlock : public UTextBlock, public IKzSelectableWidgetInterface
@@ -61,8 +64,25 @@ private:
 
 	TSharedPtr<SWrapBox> MyBox;
 
+	/** Display string and icon theme the content was last built from: setting the same text again rebuilds nothing. */
+	FString BuiltSource;
+
+	TWeakObjectPtr<const UKzUIIconTheme> BuiltTheme;
+
+	TWeakObjectPtr<UKzUIInputSubsystem> BoundSubsystem;
+
+	FDelegateHandle TextRevisionHandle;
+
+	TSharedPtr<IBreakIterator> LineBreaker;
+
+	/** Build state: the next slot starts a new line after a line break. */
+	bool bNextOnNewLine = false;
+
+	/** Build state: whether any slot was added, so empty text still takes a line. */
+	bool bHasSlots = false;
+
 public:
-	/** Icons generated for the current text, in order of appearance. Regenerated on every text or property change: do not cache them across SetText. */
+	/** Icons generated for the current text, in order of appearance. They survive hover, selection and device changes, and are regenerated when the text, the icon theme, the culture or the wrapping settings change. */
 	UFUNCTION(Category = "KzUI", BlueprintPure)
 	TArray<UKzInputIcon*> GetIcons() const;
 
@@ -106,6 +126,12 @@ protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	//~ End UWidget Interface
 
+	//~ Begin UTextLayoutWidget Interface
+	virtual void OnJustificationChanged(ETextJustify::Type InJustification) override;
+	virtual void OnAutoWrapTextChanged(bool InAutoWrapText) override;
+	virtual void OnWrapTextAtChanged(float InWrapTextAt) override;
+	//~ End UTextLayoutWidget Interface
+
 private:
 	void ApplyStyle();
 	const UKzTextStyle* ResolveLook(EKzUIWidgetState State) const;
@@ -114,4 +140,16 @@ private:
 	void AddTextBlock(const FString& Word);
 	void AddIcon(EKzUIInputType Input, FName CustomToken, FName Variation, int32 SpacesBefore, int32 SpacesAfter);
 	const UKzUIIconTheme* GetActiveIconTheme() const;
+
+	/** Height of a line in the current font, which the icons follow. */
+	float GetLineHeight() const;
+
+	/** Returns whether the next slot starts a new line, and records that a slot was added. */
+	bool TakeNewLine();
+
+	/** Only a change of icon theme rebuilds: custom tokens are recognized against it. Icons refresh themselves on device changes. */
+	UFUNCTION()
+	void OnInputDeviceChanged(EKzUIInputDevice InputDevice);
+
+	void OnTextRevisionChanged();
 };

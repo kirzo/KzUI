@@ -1,14 +1,12 @@
 // Copyright 2026 kirzo
 
 #include "KzInputIcon.h"
+#include "KzUIFlipbook.h"
 #include "KzUIIconTheme.h"
 #include "KzUIInputSettings.h"
 #include "KzUIInputSubsystem.h"
 
-#include "Engine/GameInstance.h"
-#include "Engine/LocalPlayer.h"
 #include "Engine/Texture2D.h"
-#include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -46,16 +44,7 @@ void UKzInputIcon::OnWidgetRebuilt()
 
 UKzUIInputSubsystem* UKzInputIcon::BindPlayerSubsystem()
 {
-	// Widgets created before the player is known have no owner yet: they follow the first player, like the engine's own default
-	const ULocalPlayer* LocalPlayer = GetOwningLocalPlayer();
-	if (!LocalPlayer)
-	{
-		const UWorld* World = GetWorld();
-		const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
-		LocalPlayer = GameInstance ? GameInstance->GetFirstGamePlayer() : nullptr;
-	}
-
-	UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(LocalPlayer);
+	UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::GetForWidget(this);
 	if (Subsystem != BoundSubsystem.Get())
 	{
 		if (UKzUIInputSubsystem* Previous = BoundSubsystem.Get())
@@ -102,6 +91,20 @@ void UKzInputIcon::RefreshIcon()
 		return;
 	}
 
+	// A material has no size of its own, and a variation wraps a texture that does
+	if (const UTexture2D* Texture = Cast<UTexture2D>(Icon))
+	{
+		NaturalSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+	}
+	else if (const UKzUIFlipbook* AsFlipbook = Cast<UKzUIFlipbook>(Icon))
+	{
+		NaturalSize = AsFlipbook->FrameSize;
+	}
+	else
+	{
+		NaturalSize = FVector2D(1.0, 1.0);
+	}
+
 	// The icon may follow a ClearIcon
 	if (GetBrush().DrawAs == ESlateBrushDrawType::NoDrawType)
 	{
@@ -135,6 +138,7 @@ void UKzInputIcon::RefreshIcon()
 
 void UKzInputIcon::ClearIcon()
 {
+	NaturalSize = FVector2D::ZeroVector;
 	SetFlipbook(nullptr);
 	FSlateBrush NewBrush = GetBrush();
 	NewBrush.SetResourceObject(nullptr);

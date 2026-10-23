@@ -61,6 +61,9 @@ public:
 	/** Subsystem of the local player Slate routes the given user index to. */
 	static UKzUIInputSubsystem* FindForSlateUser(int32 UserIndex);
 
+	/** Subsystem of the widget's owning player, or of the game's first player for widgets created before their player was known, as the engine does for widgets owned by the game instance. */
+	static UKzUIInputSubsystem* GetForWidget(const UWidget* Widget);
+
 	/** Pad family native to the running platform: the fallback for unmapped pads and the gamepad device before any pad is used. */
 	static EKzUIInputDevice GetPlatformGamepadDevice();
 

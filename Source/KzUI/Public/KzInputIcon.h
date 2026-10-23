@@ -40,6 +40,9 @@ public:
 	UFUNCTION(Category = "KzUI|Icon", BlueprintCallable)
 	void SetVariation(FName NewVariation);
 
+	/** Size of the icon shown, for its aspect ratio: the texture or flipbook frame size, square for a material, zero when nothing is shown. */
+	FVector2D GetNaturalSize() const { return NaturalSize; }
+
 	//~ Begin UWidget Interface
 	virtual void SynchronizeProperties() override;
 
@@ -60,4 +63,6 @@ private:
 	void OnInputDeviceChanged(EKzUIInputDevice InputDevice);
 
 	TWeakObjectPtr<class UKzUIInputSubsystem> BoundSubsystem;
+
+	FVector2D NaturalSize = FVector2D::ZeroVector;
 };
