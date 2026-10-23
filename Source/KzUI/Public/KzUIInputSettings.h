@@ -28,6 +28,14 @@ public:
 
 	static const UKzUIInputSettings* Get() { return GetDefault<UKzUIInputSettings>(); }
 
+	/** Keys of Input for a player on the given pad family, resolved once per family. */
+	const FKzUIInputDefinition* FindInputDefinition(EKzUIInputType Input, EKzUIInputDevice GamepadDevice) const;
+
+	virtual void PostReloadConfig(FProperty* PropertyThatWasLoaded) override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 	UPROPERTY(Category = Input, EditAnywhere, Config, meta = (ReadOnlyKeys, ForceInlineRow))
 	TMap<EKzUIInputType, FKzUIInputData> InputMap;
 
@@ -53,4 +61,8 @@ public:
 	/** Prompt widget spawned by UKzUserWidget::ShowPrompt. Same rename caveat as SoundTheme. */
 	UPROPERTY(Category = Prompt, EditAnywhere, Config)
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
+
+private:
+	/** InputMap resolved per pad family, built on first use and dropped when the settings change. */
+	mutable TMap<EKzUIInputDevice, TMap<EKzUIInputType, FKzUIInputDefinition>> ResolvedInputs;
 };

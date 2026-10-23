@@ -548,15 +548,13 @@ EKzUIInputDevice UKzUserWidget::GetGamepadDevice() const
 	return Subsystem ? Subsystem->GetGamepadDevice() : UKzUIInputSubsystem::GetPlatformGamepadDevice();
 }
 
-FKzUIInputDefinition UKzUserWidget::GetInputDefinition(EKzUIInputType Input) const
+const FKzUIInputDefinition* UKzUserWidget::FindInputDefinition(EKzUIInputType Input) const
 {
 	if (const FKzUIInputDefinition* Override = InputMapOverrides.Find(Input))
 	{
-		return *Override;
+		return Override;
 	}
-
-	const FKzUIInputData* Data = UKzUIInputSettings::Get()->InputMap.Find(Input);
-	return Data ? Data->GetInputDefinition(GetGamepadDevice()) : FKzUIInputDefinition();
+	return UKzUIInputSettings::Get()->FindInputDefinition(Input, GetGamepadDevice());
 }
 
 EKzUIInputType UKzUserWidget::GetInputFromKey(const FKey& Key) const
@@ -564,7 +562,7 @@ EKzUIInputType UKzUserWidget::GetInputFromKey(const FKey& Key) const
 	// The preprocessor tracks the pad before the key gets here, so a pad key resolves with its own family
 	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
 	{
-		if (GetInputDefinition(Pair.Key).Contains(Key))
+		if (IsInputMappedToKey(Pair.Key, Key))
 		{
 			return Pair.Key;
 		}
@@ -574,7 +572,8 @@ EKzUIInputType UKzUserWidget::GetInputFromKey(const FKey& Key) const
 
 bool UKzUserWidget::IsInputMappedToKey(EKzUIInputType Input, const FKey& Key) const
 {
-	return GetInputDefinition(Input).Contains(Key);
+	const FKzUIInputDefinition* Definition = FindInputDefinition(Input);
+	return Definition && Definition->Contains(Key);
 }
 
 void UKzUserWidget::ResetInputMap(EKzUIInputType Input)

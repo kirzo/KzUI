@@ -242,7 +242,7 @@ private:
 	EKzUIInputDevice GetGamepadDevice() const;
 
 	/** This instance's override, or the project settings resolved for the owning player's pad. */
-	FKzUIInputDefinition GetInputDefinition(EKzUIInputType Input) const;
+	const FKzUIInputDefinition* FindInputDefinition(EKzUIInputType Input) const;
 
 	/** This instance's override, or the project settings. */
 	const FKzUIInputTriggerConfig* FindTriggerConfig(EKzUIInputType Input) const;

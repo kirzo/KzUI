@@ -68,9 +68,11 @@ EKzUIInputType UKzUIFunctionLibrary::GetInputFromKeyEvent(const FKeyEvent& InKey
 	const FKey Key = InKeyEvent.GetKey();
 	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::FindForSlateUser(InKeyEvent.GetUserIndex());
 	const EKzUIInputDevice GamepadDevice = Subsystem ? Subsystem->GetGamepadDevice() : UKzUIInputSubsystem::GetPlatformGamepadDevice();
-	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
+	const UKzUIInputSettings* Settings = UKzUIInputSettings::Get();
+	for (const auto& Pair : Settings->InputMap)
 	{
-		if (Pair.Value.GetInputDefinition(GamepadDevice).Contains(Key))
+		const FKzUIInputDefinition* Definition = Settings->FindInputDefinition(Pair.Key, GamepadDevice);
+		if (Definition && Definition->Contains(Key))
 		{
 			return Pair.Key;
 		}

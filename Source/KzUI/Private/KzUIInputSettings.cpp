@@ -79,3 +79,31 @@ UKzUIInputSettings::UKzUIInputSettings()
 	Select.Windows = FKzUIInputDefinitionOverride(EKzUIInputOverrideMode::Additive, { EKeys::Tab });
 	InputMap.Add(EKzUIInputType::Select, Select);
 }
+
+const FKzUIInputDefinition* UKzUIInputSettings::FindInputDefinition(EKzUIInputType Input, EKzUIInputDevice GamepadDevice) const
+{
+	TMap<EKzUIInputType, FKzUIInputDefinition>* Resolved = ResolvedInputs.Find(GamepadDevice);
+	if (!Resolved)
+	{
+		Resolved = &ResolvedInputs.Add(GamepadDevice);
+		for (const auto& Pair : InputMap)
+		{
+			Resolved->Add(Pair.Key, Pair.Value.GetInputDefinition(GamepadDevice));
+		}
+	}
+	return Resolved->Find(Input);
+}
+
+void UKzUIInputSettings::PostReloadConfig(FProperty* PropertyThatWasLoaded)
+{
+	Super::PostReloadConfig(PropertyThatWasLoaded);
+	ResolvedInputs.Reset();
+}
+
+#if WITH_EDITOR
+void UKzUIInputSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	ResolvedInputs.Reset();
+}
+#endif
