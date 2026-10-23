@@ -144,6 +144,20 @@ bool FKzUIInputPreprocessor::HandleAnalogInputEvent(FSlateApplication& SlateApp,
 	return false;
 }
 
+void FKzUIInputPreprocessor::ReleaseStickKeys(FSlateApplication& SlateApp)
+{
+	for (auto& Pair : AxisStates)
+	{
+		FAxisState& State = Pair.Value;
+		if (State.Key.IsValid())
+		{
+			const FKey Key = State.Key;
+			State.Key = FKey();
+			InjectKeyEvent(SlateApp, Key, Pair.Key.Key, false, false);
+		}
+	}
+}
+
 bool FKzUIInputPreprocessor::TryGetDeviceForSlateUser(int32 UserIndex, EKzUIInputDevice& OutDevice) const
 {
 	if (const EKzUIInputDevice* Device = DevicesByUser.Find(UserIndex))

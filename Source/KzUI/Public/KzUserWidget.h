@@ -98,7 +98,8 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
-	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
+	virtual void NativeOnRemovedFromFocusPath(const FFocusEvent& InFocusEvent) override;
+	virtual FNavigationReply NativeOnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent, const FNavigationReply& InDefaultReply) override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 public:
@@ -154,6 +155,9 @@ public:
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintCallable)
 	bool IsInputEnabled() const;
+
+	/** Whether SetInputEnabled switched the input on and no modal child covers the widget. Widgets that do not only get the focus when no other widget wants it. */
+	bool WantsFocus() const { return bInputEnabled && !ChildWidget; }
 
 	/** Resets runtime input state, firing Released for the in-flight presses so their pending feedback can be undone. */
 	void ClearInput();

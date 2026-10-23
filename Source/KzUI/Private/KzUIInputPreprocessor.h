@@ -32,6 +32,9 @@ public:
 	/** Device last used by the given slate user. Lets a subsystem created by an input event start on the device that caused it. */
 	bool TryGetDeviceForSlateUser(int32 UserIndex, EKzUIInputDevice& OutDevice) const;
 
+	/** Releases every held synthetic stick key, for when the axis that holds it may never come back to rest (the app lost its activation). */
+	void ReleaseStickKeys(FSlateApplication& SlateApp);
+
 private:
 	struct FAxisState
 	{

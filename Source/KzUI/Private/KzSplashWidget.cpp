@@ -4,10 +4,14 @@
 #include "KzSplashPage.h"
 
 #include "Components/WidgetSwitcher.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/World.h"
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
+#include "GameFramework/InputSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "Widgets/SViewport.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogKzUI, Log, All);
 
@@ -19,50 +23,116 @@ namespace
 }
 
 /**
- * Skips the splash on any key or click, from any device and any player. While the splash is
- * alive every key and click is consumed, whether it skipped or not: the game underneath must
- * not react to button mashing during the sequence.
+ * Skips the splash on any key or click aimed at the game, from any device and player, consuming the press so the game
+ * underneath ignores button mashing. Releases, shortcuts and input aimed elsewhere (the editor in PIE) always pass.
  */
 class FKzSplashInputListener : public IInputProcessor
 {
 public:
 	TWeakObjectPtr<UKzSplashWidget> Owner;
 
+	FKzSplashInputListener()
+	{
+		ActivationHandle = FSlateApplication::Get().OnApplicationActivationStateChanged().AddRaw(this, &FKzSplashInputListener::OnActivationChanged);
+	}
+
+	virtual ~FKzSplashInputListener() override
+	{
+		if (FSlateApplication::IsInitialized())
+		{
+			FSlateApplication::Get().OnApplicationActivationStateChanged().Remove(ActivationHandle);
+		}
+	}
+
 	virtual void Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor) override {}
 
 	virtual bool HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override
 	{
-		UKzSplashWidget* Splash = Owner.Get();
-		if (!Splash)
+		// Shortcuts (Alt+Tab, Alt+Enter, Shift+F1), the console and Escape to stop PIE keep working during the splash
+		const FKey Key = InKeyEvent.GetKey();
+		if (Key.IsModifierKey() || InKeyEvent.GetModifierKeys().AnyModifiersDown() || GetDefault<UInputSettings>()->ConsoleKeys.Contains(Key) || (GIsEditor && Key == EKeys::Escape))
 		{
 			return false;
 		}
-		if (!InKeyEvent.IsRepeat())
+
+		const TSharedPtr<SViewport> Viewport = GetGameViewportWidget();
+		return Viewport && IsGameFocus(SlateApp.GetUserFocusedWidget(InKeyEvent.GetUserIndex()), Viewport) && TrySkip(SlateApp, InKeyEvent.IsRepeat());
+	}
+
+	virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override
+	{
+		return HandlePointerDown(SlateApp, MouseEvent);
+	}
+
+	virtual bool HandleMouseButtonDoubleClickEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override
+	{
+		return HandlePointerDown(SlateApp, MouseEvent);
+	}
+
+private:
+	/** Slate time of the last app activation: the click that brings the window back does not skip. */
+	double ActivationTime = -1.0;
+
+	FDelegateHandle ActivationHandle;
+
+	void OnActivationChanged(bool bActive)
+	{
+		if (bActive)
+		{
+			ActivationTime = FSlateApplication::Get().GetCurrentTime();
+		}
+	}
+
+	bool HandlePointerDown(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
+	{
+		constexpr double ActivationClickWindow = 0.1;
+		if (SlateApp.GetCurrentTime() - ActivationTime < ActivationClickWindow)
+		{
+			return false;
+		}
+
+		const TSharedPtr<SViewport> Viewport = GetGameViewportWidget();
+		const FWidgetPath UnderCursor = SlateApp.LocateWindowUnderMouse(MouseEvent.GetScreenSpacePosition(), SlateApp.GetInteractiveTopLevelWindows());
+		return Viewport && UnderCursor.IsValid() && UnderCursor.ContainsWidget(Viewport.Get()) && TrySkip(SlateApp, false);
+	}
+
+	bool TrySkip(FSlateApplication& SlateApp, bool bRepeat)
+	{
+		UKzSplashWidget* Splash = Owner.Get();
+		if (!Splash || !SlateApp.IsActive())
+		{
+			return false;
+		}
+		if (!bRepeat)
 		{
 			Splash->Skip();
 		}
 		return true;
 	}
 
-	virtual bool HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override
+	TSharedPtr<SViewport> GetGameViewportWidget() const
 	{
-		return Owner.IsValid();
+		const UKzSplashWidget* Splash = Owner.Get();
+		const UWorld* World = Splash ? Splash->GetWorld() : nullptr;
+		const UGameViewportClient* ViewportClient = World ? World->GetGameViewport() : nullptr;
+		return ViewportClient ? ViewportClient->GetGameViewportWidget() : nullptr;
 	}
 
-	virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override
+	/** Whether a user's focused widget lies in the game viewport; a user with no focus at all counts as the game's. */
+	static bool IsGameFocus(TSharedPtr<SWidget> Focused, const TSharedPtr<SViewport>& Viewport)
 	{
-		UKzSplashWidget* Splash = Owner.Get();
-		if (!Splash)
+		if (!Focused)
 		{
-			return false;
+			return true;
 		}
-		Splash->Skip();
-		return true;
-	}
-
-	virtual bool HandleMouseButtonUpEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override
-	{
-		return Owner.IsValid();
+		for (; Focused; Focused = Focused->GetParentWidget())
+		{
+			if (Focused == Viewport)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 };
 

@@ -47,6 +47,9 @@ private:
 
 	FDelegateHandle FocusChangingHandle;
 
+	/** This player's focus when the app went to the background: activating the window hands every user the keyboard user's focus. */
+	TWeakPtr<SWidget> FocusOnDeactivate;
+
 public:
 	UPROPERTY(Category = KzUI, BlueprintAssignable)
 	FKzUIInputDeviceChangedSignature OnInputDeviceChanged;
@@ -65,13 +68,13 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
-	/** Adds the widget to this player's stack; focusable widgets take the focus on arrival. */
+	/** Adds the widget to this player's stack and gives the focus to the top widget, which a focusable newcomer usually is. */
 	void RegisterWidget(UKzUserWidget* Widget);
 
-	/** Removes the widget from the stack; if it owned the focus slot, the topmost focusable widget gets it back. */
+	/** Removes the widget from the stack; if it owned the focus slot, the top widget gets it back. */
 	void UnregisterWidget(UKzUserWidget* Widget);
 
-	/** Focuses the topmost focusable widget of the stack. */
+	/** Focuses the topmost focusable widget that wants the focus; widgets with their input off (a HUD, a toast) only get it when none does. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)
 	void FocusTopWidget();
 
@@ -117,6 +120,12 @@ public:
 
 private:
 	void OnAppActivationChanged(bool bActivated);
+
+	/** Runs the tick after the app comes back, once the window activation has moved focus and capture around. */
+	void RestoreAfterActivation();
+
+	/** Captures the mouse again in the game viewport if the game captures it permanently and hides the cursor. */
+	void RecaptureMouse();
 
 	void OnFocusChanging(const FFocusEvent& FocusEvent, const FWeakWidgetPath& OldPath, const TSharedPtr<SWidget>& OldWidget, const FWidgetPath& NewPath, const TSharedPtr<SWidget>& NewWidget);
 	void RestoreStackFocus();

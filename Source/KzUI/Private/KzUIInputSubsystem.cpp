@@ -21,6 +21,7 @@
 #include "HAL/PlatformProperties.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
+#include "Slate/SceneViewport.h"
 #include "Widgets/SViewport.h"
 
 UKzUIInputSubsystem* UKzUIInputSubsystem::Get(const ULocalPlayer* LocalPlayer)
@@ -182,9 +183,9 @@ void UKzUIInputSubsystem::RegisterWidget(UKzUserWidget* Widget)
 		{
 			SuspendOtherPlayers(Widget, true);
 		}
-		if (Widget->IsFocusable() && CanTakeFocus())
+		if (Widget->IsFocusable())
 		{
-			Widget->SetFocus();
+			FocusTopWidget();
 		}
 	}
 }
@@ -288,13 +289,24 @@ void UKzUIInputSubsystem::FocusTopWidget()
 		return;
 	}
 
+	UKzUserWidget* Target = nullptr;
 	for (int32 i = WidgetStack.Num(); i--;)
 	{
-		if (IsValid(WidgetStack[i]) && WidgetStack[i]->IsFocusable())
+		UKzUserWidget* Widget = WidgetStack[i];
+		if (IsValid(Widget) && Widget->IsFocusable())
 		{
-			WidgetStack[i]->SetFocus();
-			return;
+			if (Widget->WantsFocus())
+			{
+				Target = Widget;
+				break;
+			}
+			Target = Target ? Target : Widget;
 		}
+	}
+
+	if (Target)
+	{
+		Target->SetFocus();
 	}
 }
 
@@ -400,11 +412,95 @@ UKzUIIconTheme* UKzUIInputSubsystem::GetIconTheme() const
 
 void UKzUIInputSubsystem::OnAppActivationChanged(bool bActivated)
 {
-	// Restore rather than force: on activation the focus may legitimately belong elsewhere
 	if (bActivated)
 	{
-		RestoreStackFocus();
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this](float)
+			{
+				RestoreAfterActivation();
+				return false;
+			}));
+		return;
 	}
+
+	// A key released in another app never sends its key up and Slate keeps the focus, so every press is dropped now
+	for (UKzUserWidget* Widget : WidgetStack)
+	{
+		if (IsValid(Widget))
+		{
+			Widget->ClearInput();
+		}
+	}
+	if (InputPreprocessor && FSlateApplication::IsInitialized())
+	{
+		InputPreprocessor->ReleaseStickKeys(FSlateApplication::Get());
+	}
+
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+	const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
+	FocusOnDeactivate = SlateUser ? SlateUser->GetFocusedWidget() : nullptr;
+}
+
+void UKzUIInputSubsystem::RestoreAfterActivation()
+{
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+	const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
+	const TSharedPtr<SWidget> PreviousFocus = FocusOnDeactivate.Pin();
+	FocusOnDeactivate.Reset();
+	if (!SlateUser || !FSlateApplication::Get().IsActive())
+	{
+		return;
+	}
+
+	// SWindow gives every user the keyboard user's focus on activation: another player gets its own back
+	FSlateApplication& SlateApp = FSlateApplication::Get();
+	const bool bKeyboardUser = SlateUser->GetUserIndex() == SlateApp.GetUserIndexForKeyboard();
+	if (!bKeyboardUser && PreviousFocus && SlateUser->GetFocusedWidget() != PreviousFocus && SlateUser->GetFocusedWidget() == SlateApp.GetKeyboardFocusedWidget())
+	{
+		SlateApp.SetUserFocus(SlateUser->GetUserIndex(), PreviousFocus, EFocusCause::WindowActivate);
+	}
+
+	// Restore rather than force: on activation the focus may legitimately belong elsewhere
+	RestoreStackFocus();
+
+	if (bKeyboardUser)
+	{
+		RecaptureMouse();
+	}
+}
+
+void UKzUIInputSubsystem::RecaptureMouse()
+{
+	// The game viewport only hides the cursor while it has the focus or the mouse. KzUI keeps the focus on its widgets,
+	// and the engine recaptures on activation only outside the editor, so the cursor would stay visible over the game
+	ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+	UGameViewportClient* ViewportClient = LocalPlayer ? LocalPlayer->ViewportClient.Get() : nullptr;
+	const APlayerController* PlayerController = LocalPlayer ? LocalPlayer->PlayerController.Get() : nullptr;
+	if (!ViewportClient || !PlayerController || PlayerController->ShouldShowMouseCursor() || !CanTakeFocus())
+	{
+		return;
+	}
+
+	const EMouseCaptureMode CaptureMode = ViewportClient->GetMouseCaptureMode();
+	if (CaptureMode != EMouseCaptureMode::CapturePermanently && CaptureMode != EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown)
+	{
+		return;
+	}
+
+	const FSceneViewport* Viewport = ViewportClient->GetGameViewport();
+	const TSharedPtr<SViewport> ViewportWidget = ViewportClient->GetGameViewportWidget();
+	if (!Viewport || !ViewportWidget || Viewport->HasMouseCapture())
+	{
+		return;
+	}
+
+	// Applied by the engine loop on the game viewport next frame, like the player controller's input modes
+	FReply& SlateOperations = LocalPlayer->GetSlateOperations();
+	SlateOperations.CaptureMouse(ViewportWidget.ToSharedRef());
+	if (ViewportClient->LockDuringCapture())
+	{
+		SlateOperations.LockMouseToWidget(ViewportWidget.ToSharedRef());
+	}
+	SlateOperations.UseHighPrecisionMouseMovement(ViewportWidget.ToSharedRef());
 }
 
 void UKzUIInputSubsystem::OnFocusChanging(const FFocusEvent& FocusEvent, const FWeakWidgetPath& OldPath, const TSharedPtr<SWidget>& OldWidget, const FWidgetPath& NewPath, const TSharedPtr<SWidget>& NewWidget)

@@ -96,7 +96,7 @@ void UKzUIFunctionLibrary::CreateWidgetAsync(UObject* WorldContextObject, FLaten
 bool UKzUIFunctionLibrary::ProjectWorldLocationToViewport(UUserWidget* Widget, FVector WorldLocation, FVector2D& ViewportPosition, bool bClampInsideViewport, float ClampOffset)
 {
 	ViewportPosition = FVector2D::ZeroVector;
-	APlayerController* PC = Widget->GetOwningPlayer();
+	APlayerController* PC = Widget ? Widget->GetOwningPlayer() : nullptr;
 	if (!IsValid(PC) || !PC->PlayerCameraManager)
 	{
 		return false;

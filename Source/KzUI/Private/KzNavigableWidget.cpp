@@ -179,8 +179,11 @@ void UKzNavigableWidget::AcceptInputTriggered_Implementation(bool Handled)
 			{
 				PlaySelectSound();
 			}
-			SelectOption(HoveredOption);
-			ReceiveOnOptionAccepted(HoveredOption, HoveredOption->GetFName());
+
+			// Kept aside: the option's OnSelect may change the options and the hover
+			UWidget* Accepted = HoveredOption;
+			SelectOption(Accepted);
+			ReceiveOnOptionAccepted(Accepted, Accepted->GetFName());
 		}
 	}
 }

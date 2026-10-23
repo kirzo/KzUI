@@ -126,7 +126,7 @@ FReply UKzUserWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEve
 		const EKzUIInputType Input = GetInputFromKey(Key);
 		if (Input != EKzUIInputType::None)
 		{
-			// Only inputs the widget actually handled are consumed; rejected ones bubble to the game
+			// Only inputs the widget actually handled are consumed; rejected ones bubble, though Slate keeps navigation keys
 			if (ProcessInputPressed(Input, Key, InKeyEvent.IsRepeat()) == EKzUIInputResult::Handled)
 			{
 				Reply = FReply::Handled();
@@ -154,13 +154,20 @@ FReply UKzUserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent
 	return bAllowNativeOnKeyUpCall ? Super::NativeOnKeyUp(InGeometry, InKeyEvent) : Reply;
 }
 
-void UKzUserWidget::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
+void UKzUserWidget::NativeOnRemovedFromFocusPath(const FFocusEvent& InFocusEvent)
 {
-	Super::NativeOnFocusLost(InFocusEvent);
+	Super::NativeOnRemovedFromFocusPath(InFocusEvent);
 
-	// The release of any in-flight press will go to the new focus owner, so the state is reset
-	// here: otherwise the next press of the same input is swallowed as a repeat
+	// The release of an in-flight press goes to the new focus owner, so the next press would be swallowed as a repeat.
+	// The focus path and not the focused leaf, because a clicked button inside the widget becomes the leaf
 	ClearInput();
+}
+
+FNavigationReply UKzUserWidget::NativeOnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent, const FNavigationReply& InDefaultReply)
+{
+	// Slate turns every navigation key this widget leaves unhandled into a focus move that would
+	// carry the player's focus to whatever focusable widget lies that way
+	return IsInputEnabled() ? FNavigationReply::Stop() : Super::NativeOnNavigation(MyGeometry, InNavigationEvent, InDefaultReply);
 }
 
 void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -177,28 +184,37 @@ void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
 	for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
 	{
-		if (IsInputPressed(Input))
+		FKzUIInputPressedState* State = InputPressedState.Find(Input);
+		if (!State)
 		{
-			FKzUIInputPressedState& State = InputPressedState[Input];
-			State.Time += InDeltaTime;
+			continue;
+		}
 
-			// Unsupported inputs are tracked for chords but fire nothing
-			if (!SupportsInput(Input))
-			{
-				continue;
-			}
+		State->Time += InDeltaTime;
+		const float HeldTime = State->Time;
 
-			const bool bHandled = CanHandleAnyInput() && CanHandleInput(Input);
+		// Unsupported inputs are tracked for chords but fire nothing
+		if (!SupportsInput(Input))
+		{
+			continue;
+		}
 
-			AnyInputHeld(Input, bHandled, State.Time);
-			InputHeld[Input](bHandled, State.Time);
+		// Blueprint events may clear the input or remove the widget, so the state is looked up again after each
+		const bool bHandled = CanHandleAnyInput() && CanHandleInput(Input);
+		AnyInputHeld(Input, bHandled, HeldTime);
+		if (!IsInputPressed(Input))
+		{
+			continue;
+		}
 
-			const FKzUIInputTriggerConfig Trigger = TriggerMap.FindRef(Input);
-			if (Trigger.Trigger == EKzUIInputTrigger::Hold && !State.bTriggerFired && State.Time >= Trigger.HoldTime)
-			{
-				State.bTriggerFired = true;
-				FireInputTriggered(Input);
-			}
+		InputHeld[Input](bHandled, HeldTime);
+		State = InputPressedState.Find(Input);
+
+		const FKzUIInputTriggerConfig* Trigger = TriggerMap.Find(Input);
+		if (State && Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && !State->bTriggerFired && State->Time >= Trigger->HoldTime)
+		{
+			State->bTriggerFired = true;
+			FireInputTriggered(Input);
 		}
 	}
 
@@ -212,7 +228,9 @@ void UKzUserWidget::RemoveFromParent()
 
 void UKzUserWidget::RemoveFromStack(bool bPropagate)
 {
-	if (!IsDesignTime() && !HasAnyFlags(RF_ClassDefaultObject | RF_BeginDestroyed))
+	// UPanelWidget::AddChild also calls RemoveFromParent to detach a widget before adding it: that is not a removal
+	const bool bOnScreen = GetParent() || IsInViewport();
+	if (bOnScreen && !IsDesignTime() && !HasAnyFlags(RF_ClassDefaultObject | RF_BeginDestroyed))
 	{
 		// A switcher page closes by handing control back to the switcher, not by removing itself
 		bool bOnActivePage = true;
@@ -247,24 +265,33 @@ UKzUserWidget* UKzUserWidget::CreateDynamicChild(TSubclassOf<UKzUserWidget> Cont
 
 void UKzUserWidget::AddDynamicChild(UKzUserWidget* Content, int32 ZOrder, bool bHideWhileOpen)
 {
-	if (Content != nullptr)
+	if (Content == nullptr)
 	{
-		ClearChild();
-		ChildWidget = Content;
-		ChildWidget->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
-		ChildWidget->AddToViewport(ZOrder);
-		ChildWidget->SetFocus();
-
-		// IsSet guards replacing one hiding child with another: the visibility to restore is
-		// the one from before the first of them
-		if (bHideWhileOpen && !VisibilityBeforeChild.IsSet())
-		{
-			VisibilityBeforeChild = GetVisibility();
-			SetVisibility(ESlateVisibility::Collapsed);
-		}
-
-		OnAddChild(ChildWidget);
+		return;
 	}
+
+	ClearChild();
+	Content->AddToViewport(ZOrder);
+
+	// A child that closed itself while constructing never becomes the modal
+	if (!Content->IsInViewport())
+	{
+		return;
+	}
+
+	ChildWidget = Content;
+	Content->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
+	Content->SetFocus();
+
+	// IsSet guards replacing one hiding child with another: the visibility to restore is
+	// the one from before the first of them
+	if (bHideWhileOpen && !VisibilityBeforeChild.IsSet())
+	{
+		VisibilityBeforeChild = GetVisibility();
+		SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	OnAddChild(Content);
 }
 
 UKzPromptWidget* UKzUserWidget::ShowPrompt(FText Message, FText ConfirmMessage, FText CancelMessage, FKzUISimpleDelegate OnConfirm, FKzUISimpleDelegate OnCancel, TSubclassOf<UKzPromptWidget> ClassOverride)
@@ -301,20 +328,29 @@ UKzUserWidget* UKzUserWidget::CreateSlottedDynamicChild(UPanelWidget* Panel, TSu
 
 void UKzUserWidget::AddSlottedDynamicChild(UPanelWidget* Panel, UKzUserWidget* Content)
 {
-	if (Content != nullptr && Panel != nullptr)
+	if (Content == nullptr || Panel == nullptr)
 	{
-		ClearChild();
-		ChildWidget = Content;
-		ChildWidget->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
-		UPanelSlot* ReturnSlot = Panel->AddChild(ChildWidget);
-		ChildWidget->SetFocus();
-		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(ReturnSlot))
-		{
-			CanvasSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
-			CanvasSlot->SetOffsets(FMargin());
-		}
-		OnAddChild(ChildWidget);
+		return;
 	}
+
+	ClearChild();
+	UPanelSlot* ReturnSlot = Panel->AddChild(Content);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(ReturnSlot))
+	{
+		CanvasSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+		CanvasSlot->SetOffsets(FMargin());
+	}
+
+	// A child that closed itself while constructing never becomes the modal
+	if (Content->GetParent() != Panel)
+	{
+		return;
+	}
+
+	ChildWidget = Content;
+	Content->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
+	Content->SetFocus();
+	OnAddChild(Content);
 }
 
 void UKzUserWidget::OnAddChild(UKzUserWidget* Child)
@@ -362,6 +398,12 @@ void UKzUserWidget::SetInputEnabled(const bool bNewEnabled)
 		if (bInputEnabled)
 		{
 			LifeTime = 0.0f;
+
+			// A widget switched on later than its construct may now be the one that should hold the focus
+			if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
+			{
+				Subsystem->FocusTopWidget();
+			}
 		}
 		else
 		{
