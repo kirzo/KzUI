@@ -133,7 +133,12 @@ FReply UKzUserWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEve
 			}
 		}
 	}
-	return bAllowNativeOnKeyDownCall ? Super::NativeOnKeyDown(InGeometry, InKeyEvent) : Reply;
+	if (bAllowNativeOnKeyDownCall)
+	{
+		const FReply NativeReply = Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+		return Reply.IsEventHandled() ? Reply : NativeReply;
+	}
+	return Reply;
 }
 
 FReply UKzUserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -141,8 +146,22 @@ FReply UKzUserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent
 	FReply Reply = FReply::Unhandled();
 	if (IsInputEnabled())
 	{
+		// The press decides which input a key releases, even if the mapping changed while it was held
 		const FKey Key = InKeyEvent.GetKey();
-		const EKzUIInputType Input = GetInputFromKey(Key);
+		EKzUIInputType Input = EKzUIInputType::None;
+		for (const auto& Pair : InputPressedState)
+		{
+			if (Pair.Value.Keys.Contains(Key))
+			{
+				Input = Pair.Key;
+				break;
+			}
+		}
+		if (Input == EKzUIInputType::None)
+		{
+			Input = GetInputFromKey(Key);
+		}
+
 		if (Input != EKzUIInputType::None)
 		{
 			if (ProcessInputReleased(Input, Key) == EKzUIInputResult::Handled)
@@ -151,7 +170,12 @@ FReply UKzUserWidget::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent
 			}
 		}
 	}
-	return bAllowNativeOnKeyUpCall ? Super::NativeOnKeyUp(InGeometry, InKeyEvent) : Reply;
+	if (bAllowNativeOnKeyUpCall)
+	{
+		const FReply NativeReply = Super::NativeOnKeyUp(InGeometry, InKeyEvent);
+		return Reply.IsEventHandled() ? Reply : NativeReply;
+	}
+	return Reply;
 }
 
 void UKzUserWidget::NativeOnRemovedFromFocusPath(const FFocusEvent& InFocusEvent)
@@ -560,22 +584,27 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 	FKzUIInputPressedState& State = InputPressedState.FindOrAdd(Input);
 	State.Keys.AddUnique(Key);
 
-	if (!SupportsInput(Input) || bWasPressed)
+	// Repeats and extra keys of a held input go wherever its first press went
+	if (bWasPressed)
+	{
+		return State.bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Ignored;
+	}
+	if (!SupportsInput(Input))
 	{
 		return EKzUIInputResult::Ignored;
 	}
 
-	const FKzUIInputTriggerConfig Trigger = TriggerMap.FindRef(Input);
-	switch (Trigger.Trigger)
+	const FKzUIInputTriggerConfig* Trigger = TriggerMap.Find(Input);
+	switch (Trigger ? Trigger->Trigger : EKzUIInputTrigger::Press)
 	{
 		case EKzUIInputTrigger::DoubleTap:
 		{
 			const float* LastTap = LastTapTime.Find(Input);
-			if (LastTap && LifeTime - *LastTap <= Trigger.TapInterval)
+			if (LastTap && LifeTime - *LastTap <= Trigger->TapInterval)
 			{
 				LastTapTime.Remove(Input);
 				State.bTriggerFired = true;
-				return FireInputTriggered(Input);
+				return FirePressTriggered(Input);
 			}
 			// The first tap is not consumed: the key keeps working for the game
 			LastTapTime.Add(Input, LifeTime);
@@ -583,7 +612,7 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 		}
 		case EKzUIInputTrigger::Chord:
 		{
-			for (EKzUIInputType Required : Trigger.RequiredInputs)
+			for (EKzUIInputType Required : Trigger->RequiredInputs)
 			{
 				// Modifiers must already be held; an incomplete chord bubbles to the game
 				if (!IsInputPressed(Required))
@@ -592,7 +621,7 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 				}
 			}
 			State.bTriggerFired = true;
-			return FireInputTriggered(Input);
+			return FirePressTriggered(Input);
 		}
 		case EKzUIInputTrigger::Hold:
 		{
@@ -602,9 +631,21 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 		default:
 		{
 			State.bTriggerFired = true;
-			return FireInputTriggered(Input);
+			return FirePressTriggered(Input);
 		}
 	}
+}
+
+EKzUIInputResult UKzUserWidget::FirePressTriggered(const EKzUIInputType Input)
+{
+	const EKzUIInputResult Result = FireInputTriggered(Input);
+
+	// Looked up again: the Triggered events may have cleared the input
+	if (FKzUIInputPressedState* State = InputPressedState.Find(Input))
+	{
+		State->bConsumed = Result == EKzUIInputResult::Handled;
+	}
+	return Result;
 }
 
 EKzUIInputResult UKzUserWidget::ProcessInputReleased(const EKzUIInputType Input, const FKey& Key)
@@ -621,24 +662,22 @@ EKzUIInputResult UKzUserWidget::ProcessInputReleased(const EKzUIInputType Input,
 
 	FKzUIInputPressedState& State = InputPressedState[Input];
 	State.Keys.Remove(Key);
+	const bool bConsumed = State.bConsumed;
 	if (State.Keys.Num() > 0)
 	{
-		return EKzUIInputResult::Ignored;
+		return bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Ignored;
 	}
 
-	const bool bFired = State.bTriggerFired || TriggerMap.FindRef(Input).Trigger == EKzUIInputTrigger::Press;
 	InputPressedState.Remove(Input);
-
 	if (!SupportsInput(Input))
 	{
 		return EKzUIInputResult::Ignored;
 	}
 
-	// Released always fires so a cancelled pending trigger can undo its feedback, but only a
-	// release whose press actually triggered may consume the key: the game saw the pending
-	// press go down, so it must see it go up too
-	const EKzUIInputResult Result = FireInputReleased(Input);
-	return bFired ? Result : EKzUIInputResult::Unhandled;
+	// Released always fires so a cancelled pending trigger can undo its feedback, but the key up goes
+	// wherever its key down went: the game sees both halves of a press or neither
+	FireInputReleased(Input);
+	return bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Unhandled;
 }
 
 EKzUIInputResult UKzUserWidget::FireInputTriggered(const EKzUIInputType Input)

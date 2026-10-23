@@ -50,7 +50,8 @@ public:
 	//~ Begin UUserWidget Interface
 protected:
 	virtual void NativeConstruct() override;
-	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	//~ End UUserWidget Interface
 
@@ -154,4 +155,18 @@ private:
 
 	UFUNCTION()
 	void OnButtonClicked();
+
+	/** Whether the mouse may drive the hover: the player is on keyboard and mouse, so a still cursor under a pad player's menu changes nothing. */
+	bool IsUsingMouse() const;
+
+	UWidget* GetOptionUnderCursor(const FVector2D& ScreenPosition) const;
+
+	/** Hovers the option and triggers Accept through the same gates as a key press. */
+	void AcceptWithMouse(UWidget* Option);
+
+	/** Option under the left button when it went down: only a release over the same option accepts. */
+	TWeakObjectPtr<UWidget> MousePressedOption;
+
+	/** Buttons of the options, bound once per OverrideOptions to accept their own clicks. */
+	TArray<TWeakObjectPtr<UButton>> BoundButtons;
 };

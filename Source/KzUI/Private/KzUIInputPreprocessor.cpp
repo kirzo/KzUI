@@ -67,7 +67,7 @@ void FKzUIInputPreprocessor::Tick(const float DeltaTime, FSlateApplication& Slat
 		if (State.Key.IsValid() && Now >= State.NextRepeatTime)
 		{
 			State.NextRepeatTime = Now + GetButtonRepeatDelays().Interval;
-			InjectKeyEvent(SlateApp, State.Key, Pair.Key.Key, true, true);
+			InjectKeyEvent(SlateApp, State.Key, Pair.Key.Key, State.DeviceId, true, true);
 		}
 	}
 }
@@ -91,6 +91,16 @@ bool FKzUIInputPreprocessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const
 bool FKzUIInputPreprocessor::HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
 {
 	TrackDevice(MouseEvent.GetUserIndex(), MouseEvent.GetEffectingButton());
+	return false;
+}
+
+bool FKzUIInputPreprocessor::HandleMouseMoveEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
+{
+	// Slate keeps its synthetic moves away from preprocessors, so this is a real mouse moving
+	if (!MouseEvent.GetCursorDelta().IsNearlyZero())
+	{
+		TrackDevice(MouseEvent.GetUserIndex(), EKeys::MouseX);
+	}
 	return false;
 }
 
@@ -128,14 +138,15 @@ bool FKzUIInputPreprocessor::HandleAnalogInputEvent(FSlateApplication& SlateApp,
 	{
 		if (State.Key.IsValid())
 		{
-			InjectKeyEvent(SlateApp, State.Key, InAnalogInputEvent.GetUserIndex(), false, false);
+			InjectKeyEvent(SlateApp, State.Key, InAnalogInputEvent.GetUserIndex(), State.DeviceId, false, false);
 		}
 		if (NewKey.IsValid())
 		{
 			// Tracked here and not on the injected key, which is dispatched outside the device scope
 			TrackDevice(InAnalogInputEvent.GetUserIndex(), InAnalogInputEvent.GetKey());
 			State.NextRepeatTime = SlateApp.GetCurrentTime() + GetButtonRepeatDelays().Initial;
-			InjectKeyEvent(SlateApp, NewKey, InAnalogInputEvent.GetUserIndex(), true, false);
+			State.DeviceId = InAnalogInputEvent.GetInputDeviceId();
+			InjectKeyEvent(SlateApp, NewKey, InAnalogInputEvent.GetUserIndex(), State.DeviceId, true, false);
 		}
 		State.Key = NewKey;
 	}
@@ -153,7 +164,7 @@ void FKzUIInputPreprocessor::ReleaseStickKeys(FSlateApplication& SlateApp)
 		{
 			const FKey Key = State.Key;
 			State.Key = FKey();
-			InjectKeyEvent(SlateApp, Key, Pair.Key.Key, false, false);
+			InjectKeyEvent(SlateApp, Key, Pair.Key.Key, State.DeviceId, false, false);
 		}
 	}
 }
@@ -193,9 +204,10 @@ void FKzUIInputPreprocessor::TrackDevice(int32 UserIndex, const FKey& Key)
 	}
 }
 
-void FKzUIInputPreprocessor::InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, bool bPress, bool bRepeat)
+void FKzUIInputPreprocessor::InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, FInputDeviceId DeviceId, bool bPress, bool bRepeat)
 {
-	const FKeyEvent Event(Key, FModifierKeysState(), UserIndex, bRepeat, 0, 0);
+	// The index-only constructor would make up a device id from the slate user index
+	const FKeyEvent Event(Key, FModifierKeysState(), DeviceId, bRepeat, 0, 0, UserIndex);
 	TGuardValue<bool> Guard(bInjecting, true);
 	if (bPress)
 	{

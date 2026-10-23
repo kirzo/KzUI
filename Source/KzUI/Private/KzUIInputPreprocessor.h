@@ -28,6 +28,7 @@ public:
 	virtual bool HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override;
 	virtual bool HandleAnalogInputEvent(FSlateApplication& SlateApp, const FAnalogInputEvent& InAnalogInputEvent) override;
 	virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override;
+	virtual bool HandleMouseMoveEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override;
 
 	/** Device last used by the given slate user. Lets a subsystem created by an input event start on the device that caused it. */
 	bool TryGetDeviceForSlateUser(int32 UserIndex, EKzUIInputDevice& OutDevice) const;
@@ -40,6 +41,8 @@ private:
 	{
 		FKey Key;
 		double NextRepeatTime = 0.0;
+		/** The pad behind the axis, carried by the synthetic keys so the game routes them to its player. */
+		FInputDeviceId DeviceId;
 	};
 
 	/** Active synthetic stick-direction key per (slate user, analog axis). */
@@ -53,5 +56,5 @@ private:
 
 	void TrackDevice(int32 UserIndex, const FKey& Key);
 
-	void InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, bool bPress, bool bRepeat);
+	void InjectKeyEvent(FSlateApplication& SlateApp, const FKey& Key, int32 UserIndex, FInputDeviceId DeviceId, bool bPress, bool bRepeat);
 };

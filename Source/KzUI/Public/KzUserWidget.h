@@ -15,6 +15,8 @@ struct FKzUIInputPressedState
 {
 	float Time = 0.0f;
 	bool bTriggerFired = false;
+	/** Whether the first key down was consumed: its repeats and its release go the same way, so the game never sees half a press. */
+	bool bConsumed = false;
 	TArray<FKey> Keys;
 };
 
@@ -207,9 +209,14 @@ protected:
 	/** Active sound theme for the owning player. */
 	class UKzUISoundTheme* GetSoundTheme() const;
 
-private:
+	/** Fires an input's Triggered events with its sound, Handled meaning the widget could act on it. Also the way other sources (the mouse) trigger an input. */
 	EKzUIInputResult FireInputTriggered(const EKzUIInputType Input);
+
+private:
 	EKzUIInputResult FireInputReleased(const EKzUIInputType Input);
+
+	/** FireInputTriggered for a key press, recording whether the press was consumed. */
+	EKzUIInputResult FirePressTriggered(const EKzUIInputType Input);
 
 	/** Family of the owning player's last pad, which picks the gamepad key overrides. */
 	EKzUIInputDevice GetGamepadDevice() const;

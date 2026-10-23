@@ -3,11 +3,13 @@
 #include "KzNavigableWidget.h"
 #include "KzOptionWidgets.h"
 #include "KzSelectableWidgetInterface.h"
+#include "KzUIInputSubsystem.h"
 #include "KzUISoundTheme.h"
 
 #include "Blueprint/WidgetNavigation.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 
@@ -85,26 +87,40 @@ void UKzNavigableWidget::NativeConstruct()
 	Super::NativeConstruct();
 }
 
-void UKzNavigableWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UKzNavigableWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
-
-	for (UWidget* Option : Options)
+	if (IsInputEnabled() && IsUsingMouse())
 	{
-		if (Option->GetCachedGeometry().IsUnderLocation(InMouseEvent.GetScreenSpacePosition()))
+		if (UWidget* Option = GetOptionUnderCursor(InMouseEvent.GetScreenSpacePosition()))
 		{
 			HoverWidget(Option);
-			return;
 		}
 	}
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UKzNavigableWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	MousePressedOption.Reset();
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsInputEnabled())
+	{
+		if (UWidget* Option = GetOptionUnderCursor(InMouseEvent.GetScreenSpacePosition()))
+		{
+			MousePressedOption = Option;
+			return FReply::Handled();
+		}
+	}
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 FReply UKzNavigableWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (HoveredOption && HoveredOption->GetCachedGeometry().IsUnderLocation(InMouseEvent.GetScreenSpacePosition()))
+	// A release without its press over the same option (the click that brings the window back, a drag) accepts nothing
+	UWidget* Pressed = MousePressedOption.Get();
+	MousePressedOption.Reset();
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && Pressed && Pressed == GetOptionUnderCursor(InMouseEvent.GetScreenSpacePosition()))
 	{
-		PlayInputSound(EKzUIInputType::Accept);
-		AcceptInputTriggered(true);
+		AcceptWithMouse(Pressed);
 		return FReply::Handled();
 	}
 	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
@@ -488,22 +504,12 @@ void UKzNavigableWidget::HoverWidget(UWidget* Widget)
 	if (HoveredOption)
 	{
 		IKzSelectableWidgetInterface::Hover(HoveredOption, false);
-
-		if (UButton* AsButton = GetButton(HoveredOption))
-		{
-			AsButton->OnClicked.RemoveDynamic(this, &UKzNavigableWidget::OnButtonClicked);
-		}
 	}
 
 	HoveredOption = Widget;
 	PlayHoverSound();
 
 	IKzSelectableWidgetInterface::Hover(HoveredOption, true);
-
-	if (UButton* AsButton = GetButton(HoveredOption))
-	{
-		AsButton->OnClicked.AddDynamic(this, &UKzNavigableWidget::OnButtonClicked);
-	}
 }
 
 void UKzNavigableWidget::SelectOption(UWidget* Widget)
@@ -540,6 +546,24 @@ void UKzNavigableWidget::OverrideOptions(TArray<UWidget*> NewOptions)
 		if (IsValid(Option))
 		{
 			Options.Add(Option);
+		}
+	}
+
+	// A button inside an option eats the click before this widget sees it, so it reports the click itself
+	for (const TWeakObjectPtr<UButton>& Button : BoundButtons)
+	{
+		if (UButton* AsButton = Button.Get())
+		{
+			AsButton->OnClicked.RemoveDynamic(this, &UKzNavigableWidget::OnButtonClicked);
+		}
+	}
+	BoundButtons.Reset();
+	for (UWidget* Option : Options)
+	{
+		if (UButton* AsButton = GetButton(Option))
+		{
+			AsButton->OnClicked.AddUniqueDynamic(this, &UKzNavigableWidget::OnButtonClicked);
+			BoundButtons.Add(AsButton);
 		}
 	}
 
@@ -585,6 +609,39 @@ UButton* UKzNavigableWidget::GetButton(UWidget* Widget)
 
 void UKzNavigableWidget::OnButtonClicked()
 {
-	PlayInputSound(EKzUIInputType::Accept);
-	AcceptInputTriggered(true);
+	// The click does not say which button: the option under the cursor, or the hovered one for a focused button activated by key
+	UWidget* Option = GetOptionUnderCursor(FSlateApplication::Get().GetCursorPos());
+	AcceptWithMouse(Option ? Option : HoveredOption.Get());
+}
+
+bool UKzNavigableWidget::IsUsingMouse() const
+{
+	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer());
+	return !Subsystem || Subsystem->GetCurrentInputDevice() == EKzUIInputDevice::Keyboard;
+}
+
+UWidget* UKzNavigableWidget::GetOptionUnderCursor(const FVector2D& ScreenPosition) const
+{
+	for (UWidget* Option : Options)
+	{
+		if (IsWidgetSelectable(Option) && Option->GetCachedGeometry().IsUnderLocation(ScreenPosition))
+		{
+			return Option;
+		}
+	}
+	return nullptr;
+}
+
+void UKzNavigableWidget::AcceptWithMouse(UWidget* Option)
+{
+	if (!Option || !IsInputEnabled() || !SupportsInput(EKzUIInputType::Accept))
+	{
+		return;
+	}
+
+	HoverWidget(Option);
+	if (HoveredOption == Option)
+	{
+		FireInputTriggered(EKzUIInputType::Accept);
+	}
 }
