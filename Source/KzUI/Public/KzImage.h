@@ -43,6 +43,12 @@ private:
 	float PlaybackTime = 0.0f;
 	int32 LastAppliedFrame = INDEX_NONE;
 
+	/** Brush size before a flipbook resized it to its frames, given back when the flipbook goes. */
+	FVector2D SizeBeforeFlipbook = FVector2D::ZeroVector;
+
+	/** Draw type hidden by bHideWhenStreaming, given back once the texture arrives. */
+	TEnumAsByte<ESlateBrushDrawType::Type> DrawAsBeforeStreaming = ESlateBrushDrawType::Image;
+
 protected:
 	//~ Begin UWidget Interface
 	virtual TSharedRef<SWidget> RebuildWidget() override;

@@ -50,6 +50,14 @@ protected:
 private:
 	void RefreshIcon();
 
+	/** Subscribes to the device changes of the player's subsystem, moving the subscription if the player changed. */
+	class UKzUIInputSubsystem* BindPlayerSubsystem();
+
+	/** Shows no icon at all, rather than the last device's icon or the white box of an empty brush. */
+	void ClearIcon();
+
 	UFUNCTION()
 	void OnInputDeviceChanged(EKzUIInputDevice InputDevice);
+
+	TWeakObjectPtr<class UKzUIInputSubsystem> BoundSubsystem;
 };

@@ -3,7 +3,7 @@
 #include "KzImage.h"
 #include "KzUIFlipbook.h"
 
-#include "Algo/Count.h"
+#include "Algo/AnyOf.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "LatentActions.h"
@@ -14,7 +14,7 @@
 struct FKzWaitUntilTexturesLoaded : public FPendingLatentAction
 {
 public:
-	TArray<UKzImage*> Images;
+	TArray<TWeakObjectPtr<UKzImage>> Images;
 	FName ExecutionFunction;
 	int32 OutputLink;
 	FWeakObjectPtr CallbackTarget;
@@ -29,7 +29,8 @@ public:
 
 	virtual void UpdateOperation(FLatentResponse& Response) override
 	{
-		const bool bLoading = Algo::CountIf(Images, [](UKzImage* Image) { return IsValid(Image) && !Image->AreBrushTexturesLoaded(); }) > 0;
+		// Only a texture still on its way is waited for: an empty image has nothing to load
+		const bool bLoading = Algo::AnyOf(Images, [](const TWeakObjectPtr<UKzImage>& Image) { return Image.IsValid() && Image->IsStreaming(); });
 		Response.FinishAndTriggerIf(!bLoading, ExecutionFunction, OutputLink, CallbackTarget);
 	}
 };
@@ -69,6 +70,7 @@ TSharedRef<SWidget> UKzImage::RebuildWidget()
 {
 	TSharedRef<SKzImage> NewImage = SNew(SKzImage);
 	NewImage->Owner = this;
+	NewImage->FlipForRightToLeftFlowDirection(ShouldFlipForRightToLeftFlowDirection());
 	MyImage = NewImage;
 	RefreshFlipbook();
 	return NewImage;
@@ -92,6 +94,10 @@ void UKzImage::SetBrushFromSoftTexture(TSoftObjectPtr<UTexture2D> SoftTexture, b
 	if (bHideWhenStreaming)
 	{
 		FSlateBrush NewBrush = GetBrush();
+		if (NewBrush.DrawAs != ESlateBrushDrawType::NoDrawType)
+		{
+			DrawAsBeforeStreaming = NewBrush.DrawAs;
+		}
 		NewBrush.DrawAs = ESlateBrushDrawType::NoDrawType;
 		SetBrush(NewBrush);
 	}
@@ -110,7 +116,7 @@ void UKzImage::OnImageStreamingComplete(TSoftObjectPtr<UObject> LoadedSoftObject
 	if (bHideWhenStreaming)
 	{
 		FSlateBrush NewBrush = GetBrush();
-		NewBrush.DrawAs = ESlateBrushDrawType::Image;
+		NewBrush.DrawAs = DrawAsBeforeStreaming;
 		SetBrush(NewBrush);
 	}
 
@@ -146,6 +152,19 @@ void UKzImage::SetImage(UObject* Image)
 
 void UKzImage::SetFlipbook(UKzUIFlipbook* NewFlipbook)
 {
+	// A flipbook crops the brush to one frame and resizes it: leaving it gives the plain brush its full UVs and size back
+	if (Flipbook && !NewFlipbook)
+	{
+		FSlateBrush NewBrush = GetBrush();
+		NewBrush.SetUVRegion(FBox2D(ForceInit));
+		NewBrush.ImageSize = SizeBeforeFlipbook;
+		SetBrush(NewBrush);
+	}
+	else if (!Flipbook && NewFlipbook)
+	{
+		SizeBeforeFlipbook = GetBrush().ImageSize;
+	}
+
 	Flipbook = NewFlipbook;
 	RefreshFlipbook();
 }
@@ -186,15 +205,16 @@ void UKzImage::SetCurrentFrame(int32 Frame)
 
 void UKzImage::TickFlipbook(double CurrentTime, float DeltaSeconds)
 {
-	if (!bPlayingFlipbook || !Flipbook)
+	if (!bPlayingFlipbook || !Flipbook || Flipbook->TotalFrames <= 0)
 	{
 		return;
 	}
 
 	if (Flipbook->bLooping)
 	{
-		// The global clock keeps every instance of the same flipbook in phase
-		ApplyFlipbookFrame(int32(CurrentTime * Flipbook->FramesPerSecond) % Flipbook->TotalFrames);
+		// The global clock keeps every instance of the same flipbook in phase. It counts from 2^24 s plus
+		// the uptime, so the frame count needs 64 bits
+		ApplyFlipbookFrame(int32(int64(CurrentTime * Flipbook->FramesPerSecond) % Flipbook->TotalFrames));
 		return;
 	}
 
@@ -263,7 +283,8 @@ void UKzImage::CopyTo(UKzImage* Other)
 		}
 		else if (IsStreaming())
 		{
-			Other->Super::SetBrushFromSoftTexture(TSoftObjectPtr<UTexture2D>(StreamingObjectPath));
+			Other->SetFlipbook(nullptr);
+			Other->SetBrushFromSoftTexture(TSoftObjectPtr<UTexture2D>(StreamingObjectPath));
 		}
 		else
 		{
@@ -295,7 +316,9 @@ void UKzImage::WaitUntilBrushTexturesAreLoaded(const UObject* WorldContextObject
 	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		FLatentActionManager& LatentManager = World->GetLatentActionManager();
-		FKzWaitUntilTexturesLoaded* NewAction = new FKzWaitUntilTexturesLoaded(Images, LatentInfo);
-		LatentManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, NewAction);
+		if (!LatentManager.FindExistingAction<FKzWaitUntilTexturesLoaded>(LatentInfo.CallbackTarget, LatentInfo.UUID))
+		{
+			LatentManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FKzWaitUntilTexturesLoaded(Images, LatentInfo));
+		}
 	}
 }

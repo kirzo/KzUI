@@ -80,16 +80,25 @@ EKzUIInputType UKzUIFunctionLibrary::GetInputFromKeyEvent(const FKeyEvent& InKey
 
 void UKzUIFunctionLibrary::CreateWidgetAsync(UObject* WorldContextObject, FLatentActionInfo LatentInfo, UUserWidget*& Widget, TSoftClassPtr<UUserWidget> Class, APlayerController* OwningPlayer)
 {
-	auto CreateWidgetLambda = [WorldContextObject, &Widget, OwningPlayer](TSubclassOf<UUserWidget> WidgetType)
+	// The load can outlive the context object or the player, so they are held weakly
+	TWeakObjectPtr<UObject> WeakContext = WorldContextObject;
+	TWeakObjectPtr<APlayerController> WeakPlayer = OwningPlayer;
+	auto CreateWidgetLambda = [WeakContext, &Widget, WeakPlayer](TSubclassOf<UUserWidget> WidgetType)
 	{
-		Widget = UWidgetBlueprintLibrary::Create(WorldContextObject, WidgetType, OwningPlayer);
+		if (UObject* Context = WeakContext.Get())
+		{
+			Widget = UWidgetBlueprintLibrary::Create(Context, WidgetType, WeakPlayer.Get());
+		}
 	};
 
 	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
 	{
+		// A second call with the same node while loading (a double Accept) must not create a second widget
 		FLatentActionManager& LatentManager = World->GetLatentActionManager();
-		FKzLoadWidgetAction* NewAction = new FKzLoadWidgetAction(Class.ToSoftObjectPath(), CreateWidgetLambda, LatentInfo);
-		LatentManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, NewAction);
+		if (!LatentManager.FindExistingAction<FKzLoadWidgetAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
+		{
+			LatentManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FKzLoadWidgetAction(Class.ToSoftObjectPath(), CreateWidgetLambda, LatentInfo));
+		}
 	}
 }
 
