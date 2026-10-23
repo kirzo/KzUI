@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Scalability.h"
 #include "KzSettingsLibrary.generated.h"
 
 /** Engine settings the option widgets can bind to directly. Resolution, WindowMode and Quality are index-shaped (spinner), VSync is bool-shaped (toggle), ResolutionScale is value-shaped (slider). */
@@ -32,6 +33,13 @@ enum class EKzUIQualitySetting : uint8
 	Effects,
 	Foliage,
 	Shading
+};
+
+/** Engine values an index-shaped setting stands for when it sits outside its options: mixed quality levels, a resolution not in the list. */
+struct FKzUISettingState
+{
+	FIntPoint Resolution = FIntPoint::ZeroValue;
+	Scalability::FQualityLevels Quality;
 };
 
 /** Stateless wrappers over UGameUserSettings, shaped for the KzUI option widgets. */
@@ -68,4 +76,9 @@ public:
 	/** Applies and saves the pending GameUserSettings changes. */
 	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
 	static void ApplySettings();
+
+	static FKzUISettingState CaptureSettingState();
+
+	/** Puts back what CaptureSettingState read for Resolution or Quality. Quality restores every group, since Overall is the one that sits outside its options. */
+	static void RestoreSettingState(EKzUIStandardSetting Setting, const FKzUISettingState& State, bool bApply = true);
 };

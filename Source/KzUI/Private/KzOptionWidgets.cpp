@@ -27,6 +27,40 @@ TArray<UWidget*> UKzOptionWidget::GetLinkedSelectables_Implementation() const
 	return Result;
 }
 
+void UKzOptionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (ApplyCountdown >= 0.0f)
+	{
+		ApplyCountdown -= InDeltaTime;
+		if (ApplyCountdown < 0.0f)
+		{
+			UKzSettingsLibrary::ApplySettings();
+		}
+	}
+}
+
+void UKzOptionWidget::NativeDestruct()
+{
+	// A screen closed right after a change still applies it
+	if (ApplyCountdown >= 0.0f)
+	{
+		ApplyCountdown = -1.0f;
+		UKzSettingsLibrary::ApplySettings();
+	}
+	Super::NativeDestruct();
+}
+
+void UKzOptionWidget::ScheduleApply()
+{
+	// Longer than the initial key repeat delay (0.2 s by default), so a held direction never applies mid hold
+	if (bApplyImmediately)
+	{
+		ApplyCountdown = 0.25f;
+	}
+}
+
 UKzSpinner::UKzSpinner(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -50,8 +84,34 @@ void UKzSpinner::Resync_Implementation()
 	if (Setting != EKzUIStandardSetting::None)
 	{
 		SetValues(UKzSettingsLibrary::GetSettingOptions(Setting, QualitySetting), UKzSettingsLibrary::GetSettingIndex(Setting, QualitySetting));
+		InitialState = UKzSettingsLibrary::CaptureSettingState();
 	}
 	InitialIndex = SelectedIndex;
+}
+
+void UKzSpinner::Revert_Implementation()
+{
+	if (InitialIndex != INDEX_NONE)
+	{
+		SetSelectedIndex(InitialIndex);
+		return;
+	}
+	if (SelectedIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	// SetSelectedIndex only takes real options: back to the unset state, with the engine values it stood for
+	SelectedIndex = INDEX_NONE;
+	RefreshValueText();
+
+	if (Setting != EKzUIStandardSetting::None)
+	{
+		UKzSettingsLibrary::RestoreSettingState(Setting, InitialState, false);
+		ScheduleApply();
+	}
+	OnValueChanged.Broadcast(SelectedIndex, GetSelectedValue());
+	ReceiveOnValueChanged(SelectedIndex, GetSelectedValue());
 }
 
 bool UKzSpinner::WantsInput_Implementation(EKzUIInputType Input) const
@@ -83,7 +143,8 @@ void UKzSpinner::SetSelectedIndex(int32 NewIndex)
 
 	if (Setting != EKzUIStandardSetting::None)
 	{
-		UKzSettingsLibrary::SetSettingIndex(Setting, SelectedIndex, bApplyImmediately, QualitySetting);
+		UKzSettingsLibrary::SetSettingIndex(Setting, SelectedIndex, false, QualitySetting);
+		ScheduleApply();
 	}
 	OnValueChanged.Broadcast(SelectedIndex, GetSelectedValue());
 	ReceiveOnValueChanged(SelectedIndex, GetSelectedValue());
@@ -184,7 +245,8 @@ void UKzSlider::SetValue(float NewValue)
 
 	if (Setting != EKzUIStandardSetting::None)
 	{
-		UKzSettingsLibrary::SetSettingValue(Setting, Value, bApplyImmediately);
+		UKzSettingsLibrary::SetSettingValue(Setting, Value, false);
+		ScheduleApply();
 	}
 	OnValueChanged.Broadcast(Value);
 	ReceiveOnValueChanged(Value);
@@ -254,7 +316,8 @@ void UKzToggle::SetChecked(bool bNewChecked)
 
 	if (Setting != EKzUIStandardSetting::None)
 	{
-		UKzSettingsLibrary::SetSettingEnabled(Setting, bChecked, bApplyImmediately);
+		UKzSettingsLibrary::SetSettingEnabled(Setting, bChecked, false);
+		ScheduleApply();
 	}
 	OnCheckedChanged.Broadcast(bChecked);
 	ReceiveOnCheckedChanged(bChecked);

@@ -29,7 +29,7 @@ public:
 	UPROPERTY(Category = "KzUI|Option", EditAnywhere)
 	bool bSelectable = true;
 
-	/** With a bound Setting: apply and save on every change. Off, changes are only staged until UKzSettingsLibrary::ApplySettings (confirm-on-exit flows); discard them by reverting the rows. */
+	/** With a bound Setting: apply and save each change once the value rests for a moment, so holding a direction applies once. Applying also applies whatever other rows have staged. Off, changes are only staged until UKzSettingsLibrary::ApplySettings (confirm-on-exit flows); discard them by reverting the rows. */
 	UPROPERTY(Category = "KzUI|Option", EditAnywhere)
 	bool bApplyImmediately = true;
 
@@ -54,6 +54,17 @@ public:
 	virtual bool CanBeSelected_Implementation() const override { return false; }
 	virtual TArray<UWidget*> GetLinkedSelectables_Implementation() const override;
 	//~ End IKzSelectableWidgetInterface
+
+protected:
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual void NativeDestruct() override;
+
+	/** With bApplyImmediately, applies the settings once the value has rested for a moment. */
+	void ScheduleApply();
+
+private:
+	/** Seconds left before the scheduled apply; negative with none pending. */
+	float ApplyCountdown = -1.0f;
 };
 
 /** Option row that cycles a list of values with Left/Right while hovered. Bind ValueText to display the current value. */
@@ -103,7 +114,7 @@ protected:
 public:
 	UKzSpinner(const FObjectInitializer& ObjectInitializer);
 
-	virtual void Revert_Implementation() override { SetSelectedIndex(InitialIndex); }
+	virtual void Revert_Implementation() override;
 	virtual bool HasChanges_Implementation() const override { return SelectedIndex != InitialIndex; }
 	virtual void Resync_Implementation() override;
 
@@ -136,6 +147,9 @@ private:
 	void RefreshValueText();
 
 	int32 InitialIndex = 0;
+
+	/** What a Revert to an initial value outside the options puts back. */
+	FKzUISettingState InitialState;
 };
 
 /** Option row that adjusts a normalized value with Left/Right while hovered. Bind Bar and/or ValueText to display it. */
@@ -177,7 +191,7 @@ protected:
 
 public:
 	virtual void Revert_Implementation() override { SetValue(InitialValue); }
-	virtual bool HasChanges_Implementation() const override { return !FMath::IsNearlyEqual(Value, InitialValue); }
+	virtual bool HasChanges_Implementation() const override { return !FMath::IsNearlyEqual(Value, InitialValue, UE_KINDA_SMALL_NUMBER); }
 	virtual void Resync_Implementation() override;
 
 	UFUNCTION(Category = "KzUI|Slider", BlueprintCallable)

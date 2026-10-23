@@ -186,4 +186,32 @@ void UKzSettingsLibrary::ApplySettings()
 	UGameUserSettings::GetGameUserSettings()->ApplySettings(false);
 }
 
+FKzUISettingState UKzSettingsLibrary::CaptureSettingState()
+{
+	const UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+	return { Settings->GetScreenResolution(), Settings->ScalabilityQuality };
+}
+
+void UKzSettingsLibrary::RestoreSettingState(EKzUIStandardSetting Setting, const FKzUISettingState& State, bool bApply)
+{
+	UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+	switch (Setting)
+	{
+		case EKzUIStandardSetting::Resolution:
+			Settings->SetScreenResolution(State.Resolution);
+			break;
+		case EKzUIStandardSetting::Quality:
+			// A single overall level also moves the resolution scale, so every group comes back
+			Settings->ScalabilityQuality = State.Quality;
+			break;
+		default:
+			return;
+	}
+
+	if (bApply)
+	{
+		ApplySettings();
+	}
+}
+
 #undef LOCTEXT_NAMESPACE
