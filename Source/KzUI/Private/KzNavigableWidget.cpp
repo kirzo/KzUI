@@ -3,6 +3,7 @@
 #include "KzNavigableWidget.h"
 #include "KzOptionWidgets.h"
 #include "KzSelectableWidgetInterface.h"
+#include "KzUIInputSettings.h"
 #include "KzUIInputSubsystem.h"
 #include "KzUISoundTheme.h"
 
@@ -101,8 +102,9 @@ FReply UKzNavigableWidget::NativeOnMouseMove(const FGeometry& InGeometry, const 
 
 FReply UKzNavigableWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	// Without mouse support the click falls through to the game viewport, which recaptures the mouse
 	MousePressedOption.Reset();
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsInputEnabled())
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsInputEnabled() && UKzUIInputSettings::Get()->bSupportsMouse)
 	{
 		if (UWidget* Option = GetOptionUnderCursor(InMouseEvent.GetScreenSpacePosition()))
 		{
@@ -609,6 +611,11 @@ UButton* UKzNavigableWidget::GetButton(UWidget* Widget)
 
 void UKzNavigableWidget::OnButtonClicked()
 {
+	if (!UKzUIInputSettings::Get()->bSupportsMouse)
+	{
+		return;
+	}
+
 	// The click does not say which button: the option under the cursor, or the hovered one for a focused button activated by key
 	UWidget* Option = GetOptionUnderCursor(FSlateApplication::Get().GetCursorPos());
 	AcceptWithMouse(Option ? Option : HoveredOption.Get());
@@ -617,7 +624,7 @@ void UKzNavigableWidget::OnButtonClicked()
 bool UKzNavigableWidget::IsUsingMouse() const
 {
 	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer());
-	return !Subsystem || Subsystem->GetCurrentInputDevice() == EKzUIInputDevice::Keyboard;
+	return UKzUIInputSettings::Get()->bSupportsMouse && (!Subsystem || Subsystem->GetCurrentInputDevice() == EKzUIInputDevice::Keyboard);
 }
 
 UWidget* UKzNavigableWidget::GetOptionUnderCursor(const FVector2D& ScreenPosition) const

@@ -2,6 +2,7 @@
 
 #include "KzSplashWidget.h"
 #include "KzSplashPage.h"
+#include "KzUIInputSettings.h"
 
 #include "Components/WidgetSwitcher.h"
 #include "Engine/GameViewportClient.h"
@@ -86,7 +87,7 @@ private:
 	bool HandlePointerDown(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
 	{
 		constexpr double ActivationClickWindow = 0.1;
-		if (SlateApp.GetCurrentTime() - ActivationTime < ActivationClickWindow)
+		if (!UKzUIInputSettings::Get()->bSupportsMouse || SlateApp.GetCurrentTime() - ActivationTime < ActivationClickWindow)
 		{
 			return false;
 		}

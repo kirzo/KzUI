@@ -31,7 +31,11 @@ public:
 	UPROPERTY(Category = Input, EditAnywhere, Config, meta = (ReadOnlyKeys, ForceInlineRow))
 	TMap<EKzUIInputType, FKzUIInputData> InputMap;
 
+	/** Whether the game can be played with the mouse. Off: the mouse never changes the input device, menus and the splash ignore it, and KzUI keeps the cursor hidden. */
 	UPROPERTY(Category = Input, EditAnywhere, Config)
+	bool bSupportsMouse = true;
+
+	UPROPERTY(Category = Input, EditAnywhere, Config, meta = (EditCondition = "bSupportsMouse"))
 	EKzUICursorPolicy CursorPolicy = EKzUICursorPolicy::Manual;
 
 	/** Maps hardware device identifier names (as reported by the input stack: WinDualShock, GameInput overrides, etc.) to icon device families. Unmatched keyboard/mouse devices resolve to Keyboard, anything else to the platform's own pad (Xbox on desktop). */

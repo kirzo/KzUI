@@ -194,6 +194,12 @@ FNavigationReply UKzUserWidget::NativeOnNavigation(const FGeometry& MyGeometry, 
 	return IsInputEnabled() ? FNavigationReply::Stop() : Super::NativeOnNavigation(MyGeometry, InNavigationEvent, InDefaultReply);
 }
 
+FCursorReply UKzUserWidget::NativeOnCursorQuery(const FGeometry& InGeometry, const FPointerEvent& InCursorEvent)
+{
+	// Covers the moments the game viewport has neither the focus nor the mouse, when it would show its default arrow
+	return UKzUIInputSettings::Get()->bSupportsMouse ? Super::NativeOnCursorQuery(InGeometry, InCursorEvent) : FCursorReply::Cursor(EMouseCursor::None);
+}
+
 void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	LifeTime += InDeltaTime;

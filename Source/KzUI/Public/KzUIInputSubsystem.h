@@ -47,6 +47,8 @@ private:
 
 	FDelegateHandle FocusChangingHandle;
 
+	FDelegateHandle PlayerControllerHandle;
+
 	/** This player's focus when the app went to the background: activating the window hands every user the keyboard user's focus. */
 	TWeakPtr<SWidget> FocusOnDeactivate;
 

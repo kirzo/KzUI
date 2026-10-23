@@ -140,6 +140,7 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			{
 				SetCurrentInputDevice(Device);
 			}
+			ApplyCursorPolicy();
 			return false;
 		}
 	));
@@ -148,6 +149,15 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		AppActivationHandle = FSlateApplication::Get().OnApplicationActivationStateChanged().AddUObject(this, &UKzUIInputSubsystem::OnAppActivationChanged);
 		FocusChangingHandle = FSlateApplication::Get().OnFocusChanging().AddUObject(this, &UKzUIInputSubsystem::OnFocusChanging);
+	}
+
+	// The player controller usually arrives after the local player, and the cursor is its setting
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>())
+	{
+		PlayerControllerHandle = LocalPlayer->OnPlayerControllerChanged().AddWeakLambda(this, [this](APlayerController*)
+			{
+				ApplyCursorPolicy();
+			});
 	}
 }
 
@@ -169,6 +179,12 @@ void UKzUIInputSubsystem::Deinitialize()
 	}
 	AppActivationHandle.Reset();
 	FocusChangingHandle.Reset();
+
+	if (ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>())
+	{
+		LocalPlayer->OnPlayerControllerChanged().Remove(PlayerControllerHandle);
+	}
+	PlayerControllerHandle.Reset();
 
 	WidgetStack.Empty();
 	Super::Deinitialize();
@@ -534,7 +550,9 @@ void UKzUIInputSubsystem::OnFocusChanging(const FFocusEvent& FocusEvent, const F
 
 void UKzUIInputSubsystem::ApplyCursorPolicy()
 {
-	if (UKzUIInputSettings::Get()->CursorPolicy != EKzUICursorPolicy::ByDevice)
+	// Without mouse support the cursor stays hidden whatever the policy says
+	const UKzUIInputSettings* Settings = UKzUIInputSettings::Get();
+	if (Settings->bSupportsMouse && Settings->CursorPolicy != EKzUICursorPolicy::ByDevice)
 	{
 		return;
 	}
@@ -542,7 +560,7 @@ void UKzUIInputSubsystem::ApplyCursorPolicy()
 	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
 	if (APlayerController* PlayerController = LocalPlayer ? LocalPlayer->PlayerController.Get() : nullptr)
 	{
-		PlayerController->SetShowMouseCursor(CurrentInputDevice == EKzUIInputDevice::Keyboard);
+		PlayerController->SetShowMouseCursor(Settings->bSupportsMouse && CurrentInputDevice == EKzUIInputDevice::Keyboard);
 	}
 }
 

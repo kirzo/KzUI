@@ -90,14 +90,17 @@ bool FKzUIInputPreprocessor::HandleKeyUpEvent(FSlateApplication& SlateApp, const
 
 bool FKzUIInputPreprocessor::HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
 {
-	TrackDevice(MouseEvent.GetUserIndex(), MouseEvent.GetEffectingButton());
+	if (UKzUIInputSettings::Get()->bSupportsMouse)
+	{
+		TrackDevice(MouseEvent.GetUserIndex(), MouseEvent.GetEffectingButton());
+	}
 	return false;
 }
 
 bool FKzUIInputPreprocessor::HandleMouseMoveEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
 {
 	// Slate keeps its synthetic moves away from preprocessors, so this is a real mouse moving
-	if (!MouseEvent.GetCursorDelta().IsNearlyZero())
+	if (UKzUIInputSettings::Get()->bSupportsMouse && !MouseEvent.GetCursorDelta().IsNearlyZero())
 	{
 		TrackDevice(MouseEvent.GetUserIndex(), EKeys::MouseX);
 	}
