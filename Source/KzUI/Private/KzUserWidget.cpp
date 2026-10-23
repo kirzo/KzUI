@@ -16,7 +16,7 @@
 	CanHandleInputFunc.Add(EKzUIInputType::Type, [this]() { return CanHandle##Type##Input(); }); \
 	InputTriggered.Add(EKzUIInputType::Type, [this](bool bHandled) { Type##InputTriggered(bHandled); }); \
 	InputHeld.Add(EKzUIInputType::Type, [this](bool bHandled, float Time) { Type##InputHeld(bHandled, Time); }); \
-	InputReleased.Add(EKzUIInputType::Type, [this](bool bHandled) { Type##InputReleased(bHandled); });
+	InputReleased.Add(EKzUIInputType::Type, [this](bool bHandled, bool bCancelled) { Type##InputReleased(bHandled, bCancelled); });
 
 UKzUserWidget::UKzUserWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -494,7 +494,7 @@ void UKzUserWidget::ClearInput()
 	{
 		if (SupportsInput(Pair.Key))
 		{
-			FireInputReleased(Pair.Key);
+			FireInputReleased(Pair.Key, true);
 		}
 	}
 }
@@ -693,7 +693,7 @@ EKzUIInputResult UKzUserWidget::ProcessInputReleased(const EKzUIInputType Input,
 {
 	if (ContinuousInputMask & (1 << (uint8)Input))
 	{
-		return SupportsInput(Input) ? FireInputReleased(Input) : EKzUIInputResult::Ignored;
+		return SupportsInput(Input) ? FireInputReleased(Input, false) : EKzUIInputResult::Ignored;
 	}
 
 	if (!IsInputPressed(Input))
@@ -717,7 +717,7 @@ EKzUIInputResult UKzUserWidget::ProcessInputReleased(const EKzUIInputType Input,
 
 	// Released always fires so a cancelled pending trigger can undo its feedback, but the key up goes
 	// wherever its key down went: the game sees both halves of a press or neither
-	FireInputReleased(Input);
+	FireInputReleased(Input, false);
 	return bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Unhandled;
 }
 
@@ -740,12 +740,12 @@ EKzUIInputResult UKzUserWidget::FireInputTriggered(const EKzUIInputType Input)
 	return bHandled ? EKzUIInputResult::Handled : EKzUIInputResult::Unhandled;
 }
 
-EKzUIInputResult UKzUserWidget::FireInputReleased(const EKzUIInputType Input)
+EKzUIInputResult UKzUserWidget::FireInputReleased(const EKzUIInputType Input, bool bCancelled)
 {
 	const bool bHandled = CanHandleAnyInput() && CanHandleInput(Input);
 
-	AnyInputReleased(Input, bHandled);
-	InputReleased[Input](bHandled);
+	AnyInputReleased(Input, bHandled, bCancelled);
+	InputReleased[Input](bHandled, bCancelled);
 	return bHandled ? EKzUIInputResult::Handled : EKzUIInputResult::Unhandled;
 }
 

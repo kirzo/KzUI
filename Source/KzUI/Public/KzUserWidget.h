@@ -93,7 +93,7 @@ private:
 	TMap<EKzUIInputType, TFunction<bool()>> CanHandleInputFunc;
 	TMap<EKzUIInputType, TFunction<void(bool)>> InputTriggered;
 	TMap<EKzUIInputType, TFunction<void(bool, float)>> InputHeld;
-	TMap<EKzUIInputType, TFunction<void(bool)>> InputReleased;
+	TMap<EKzUIInputType, TFunction<void(bool, bool)>> InputReleased;
 
 public:
 	UKzUserWidget(const FObjectInitializer& ObjectInitializer);
@@ -170,7 +170,7 @@ public:
 	/** Whether SetInputEnabled switched the input on, whatever else blocks it right now. */
 	bool IsInputSwitchedOn() const { return bInputEnabled; }
 
-	/** Resets runtime input state, firing Released for the in-flight presses so their pending feedback can be undone. */
+	/** Resets runtime input state, firing Released with bCancelled for the in-flight presses so their pending feedback can be undone. */
 	void ClearInput();
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintCallable)
@@ -228,7 +228,7 @@ private:
 	/** Removes the modal child and hands control back to the owner, if this is a modal child. */
 	void ReleaseModalLinks(bool bPropagate);
 
-	EKzUIInputResult FireInputReleased(const EKzUIInputType Input);
+	EKzUIInputResult FireInputReleased(const EKzUIInputType Input, bool bCancelled);
 
 	/** FireInputTriggered for a key press, recording whether the press was consumed. */
 	EKzUIInputResult FirePressTriggered(const EKzUIInputType Input);
@@ -303,9 +303,10 @@ public:
 	void AnyInputHeld(EKzUIInputType Input, bool Handled, float Time);
 	virtual void AnyInputHeld_Implementation(EKzUIInputType Input, bool Handled, float Time) {}
 
+	/** bCancelled: the press ended without a release (focus lost, input switched off, widget removed), so act-on-release logic should skip it while pending feedback is undone. Same flag on every Released event. */
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void AnyInputReleased(EKzUIInputType Input, bool Handled);
-	virtual void AnyInputReleased_Implementation(EKzUIInputType Input, bool Handled) {}
+	void AnyInputReleased(EKzUIInputType Input, bool Handled, bool bCancelled);
+	virtual void AnyInputReleased_Implementation(EKzUIInputType Input, bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void BackInputTriggered(bool Handled);
@@ -316,8 +317,8 @@ public:
 	virtual void BackInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void BackInputReleased(bool Handled);
-	virtual void BackInputReleased_Implementation(bool Handled) {}
+	void BackInputReleased(bool Handled, bool bCancelled);
+	virtual void BackInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void AcceptInputTriggered(bool Handled);
@@ -328,8 +329,8 @@ public:
 	virtual void AcceptInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void AcceptInputReleased(bool Handled);
-	virtual void AcceptInputReleased_Implementation(bool Handled) {}
+	void AcceptInputReleased(bool Handled, bool bCancelled);
+	virtual void AcceptInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void DownInputTriggered(bool Handled);
@@ -340,8 +341,8 @@ public:
 	virtual void DownInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void DownInputReleased(bool Handled);
-	virtual void DownInputReleased_Implementation(bool Handled) {}
+	void DownInputReleased(bool Handled, bool bCancelled);
+	virtual void DownInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void UpInputTriggered(bool Handled);
@@ -352,8 +353,8 @@ public:
 	virtual void UpInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void UpInputReleased(bool Handled);
-	virtual void UpInputReleased_Implementation(bool Handled) {}
+	void UpInputReleased(bool Handled, bool bCancelled);
+	virtual void UpInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void LeftInputTriggered(bool Handled);
@@ -364,8 +365,8 @@ public:
 	virtual void LeftInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void LeftInputReleased(bool Handled);
-	virtual void LeftInputReleased_Implementation(bool Handled) {}
+	void LeftInputReleased(bool Handled, bool bCancelled);
+	virtual void LeftInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void RightInputTriggered(bool Handled);
@@ -376,8 +377,8 @@ public:
 	virtual void RightInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void RightInputReleased(bool Handled);
-	virtual void RightInputReleased_Implementation(bool Handled) {}
+	void RightInputReleased(bool Handled, bool bCancelled);
+	virtual void RightInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void PreviousInputTriggered(bool Handled);
@@ -388,8 +389,8 @@ public:
 	virtual void PreviousInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void PreviousInputReleased(bool Handled);
-	virtual void PreviousInputReleased_Implementation(bool Handled) {}
+	void PreviousInputReleased(bool Handled, bool bCancelled);
+	virtual void PreviousInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void NextInputTriggered(bool Handled);
@@ -400,8 +401,8 @@ public:
 	virtual void NextInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void NextInputReleased(bool Handled);
-	virtual void NextInputReleased_Implementation(bool Handled) {}
+	void NextInputReleased(bool Handled, bool bCancelled);
+	virtual void NextInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void StartInputTriggered(bool Handled);
@@ -412,8 +413,8 @@ public:
 	virtual void StartInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void StartInputReleased(bool Handled);
-	virtual void StartInputReleased_Implementation(bool Handled) {}
+	void StartInputReleased(bool Handled, bool bCancelled);
+	virtual void StartInputReleased_Implementation(bool Handled, bool bCancelled) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
 	void SelectInputTriggered(bool Handled);
@@ -424,6 +425,6 @@ public:
 	virtual void SelectInputHeld_Implementation(bool Handled, float Time) {}
 
 	UFUNCTION(Category = "KzUI|Input", BlueprintNativeEvent, BlueprintCosmetic)
-	void SelectInputReleased(bool Handled);
-	virtual void SelectInputReleased_Implementation(bool Handled) {}
+	void SelectInputReleased(bool Handled, bool bCancelled);
+	virtual void SelectInputReleased_Implementation(bool Handled, bool bCancelled) {}
 };
