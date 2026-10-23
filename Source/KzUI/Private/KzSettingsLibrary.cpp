@@ -7,10 +7,15 @@
 
 #define LOCTEXT_NAMESPACE "KzUI"
 
-static TArray<FIntPoint> GetSupportedResolutions()
+/** The list GetSettingOptions last enumerated: indices keep matching the options a spinner shows, and stepping does not query the RHI each time. */
+static const TArray<FIntPoint>& GetSupportedResolutions(bool bRefresh = false)
 {
-	TArray<FIntPoint> Resolutions;
-	UKismetSystemLibrary::GetSupportedFullscreenResolutions(Resolutions);
+	static TArray<FIntPoint> Resolutions;
+	if (bRefresh || Resolutions.IsEmpty())
+	{
+		Resolutions.Reset();
+		UKismetSystemLibrary::GetSupportedFullscreenResolutions(Resolutions);
+	}
 	return Resolutions;
 }
 
@@ -57,7 +62,7 @@ TArray<FText> UKzSettingsLibrary::GetSettingOptions(EKzUIStandardSetting Setting
 	{
 		case EKzUIStandardSetting::Resolution:
 		{
-			for (const FIntPoint& Resolution : GetSupportedResolutions())
+			for (const FIntPoint& Resolution : GetSupportedResolutions(true))
 			{
 				Options.Add(FText::FromString(FString::Printf(TEXT("%d x %d"), Resolution.X, Resolution.Y)));
 			}
@@ -117,7 +122,7 @@ void UKzSettingsLibrary::SetSettingIndex(EKzUIStandardSetting Setting, int32 Ind
 	{
 		case EKzUIStandardSetting::Resolution:
 		{
-			const TArray<FIntPoint> Resolutions = GetSupportedResolutions();
+			const TArray<FIntPoint>& Resolutions = GetSupportedResolutions();
 			if (Resolutions.IsValidIndex(Index))
 			{
 				Settings->SetScreenResolution(Resolutions[Index]);
