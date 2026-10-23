@@ -133,6 +133,7 @@ public:
 	UFUNCTION(Category = "KzUI|Children", BlueprintCallable)
 	UKzUserWidget* CreateDynamicChild(TSubclassOf<UKzUserWidget> ContentClass, int32 ZOrder = 0, bool bHideWhileOpen = false);
 
+	/** Content goes to its owning player's screen (the viewport without one), at ZOrder or at the ZOrder of this widget's screen, whichever is higher. */
 	UFUNCTION(Category = "KzUI|Children", BlueprintCallable)
 	void AddDynamicChild(UKzUserWidget* Content, int32 ZOrder = 0, bool bHideWhileOpen = false);
 
@@ -151,6 +152,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "On Add Child"))
 	void ReceiveOnAddChild(UKzUserWidget* Child);
 
+	/** Removes the modal child, as if it had closed itself. */
 	UFUNCTION(Category = "KzUI|Children", BlueprintCallable)
 	void ClearChild();
 
@@ -226,6 +228,9 @@ protected:
 private:
 	/** Makes Content the modal child, removing the one it replaces. */
 	void AttachChild(UKzUserWidget* Content);
+
+	/** Forgets the modal child without removing it or notifying anyone. */
+	void DetachChild();
 
 	/** Removes the modal child and hands control back to the owner, if this is a modal child. */
 	void ReleaseModalLinks(bool bPropagate);

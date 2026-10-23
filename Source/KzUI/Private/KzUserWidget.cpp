@@ -7,11 +7,26 @@
 #include "KzUISoundTheme.h"
 #include "KzWidgetSwitcher.h"
 
+#include "Blueprint/GameViewportSubsystem.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+
+/** ZOrder of the nearest widget up the outer chain that sits in the viewport: the screen Widget is part of. */
+static int32 GetViewportZOrder(const UUserWidget* Widget)
+{
+	for (const UUserWidget* Current = Widget; Current; Current = Current->GetTypedOuter<UUserWidget>())
+	{
+		if (Current->IsInViewport())
+		{
+			const UGameViewportSubsystem* Subsystem = UGameViewportSubsystem::Get(Current->GetWorld());
+			return Subsystem ? Subsystem->GetWidgetSlot(Current).ZOrder : 0;
+		}
+	}
+	return 0;
+}
 
 #define ADD_INPUT_CALLBACKS(Type) \
 	CanHandleInputFunc.Add(EKzUIInputType::Type, [this]() { return CanHandle##Type##Input(); }); \
@@ -282,6 +297,10 @@ UKzUserWidget* UKzUserWidget::CreateDynamicChild(TSubclassOf<UKzUserWidget> Cont
 	}
 
 	UKzUserWidget* Content = CreateWidget<UKzUserWidget>(this, ContentClass.Get());
+	if (!Content)
+	{
+		return nullptr;
+	}
 	Content->SetOwningLocalPlayer(GetOwningLocalPlayer());
 	AddDynamicChild(Content, ZOrder, bHideWhileOpen);
 	return Content;
@@ -294,7 +313,16 @@ void UKzUserWidget::AddDynamicChild(UKzUserWidget* Content, int32 ZOrder, bool b
 		return;
 	}
 
-	Content->AddToViewport(ZOrder);
+	// The player's own part of a split screen, and never under the owner's screen
+	ZOrder = FMath::Max(ZOrder, GetViewportZOrder(this));
+	if (Content->GetOwningLocalPlayer())
+	{
+		Content->AddToPlayerScreen(ZOrder);
+	}
+	else
+	{
+		Content->AddToViewport(ZOrder);
+	}
 
 	// A child that closed itself while constructing never becomes the modal
 	if (!Content->IsInViewport())
@@ -324,6 +352,10 @@ UKzPromptWidget* UKzUserWidget::ShowPrompt(FText Message, FText ConfirmMessage, 
 	}
 
 	UKzPromptWidget* Prompt = CreateWidget<UKzPromptWidget>(this, PromptClass);
+	if (!Prompt)
+	{
+		return nullptr;
+	}
 	Prompt->SetOwningLocalPlayer(GetOwningLocalPlayer());
 	Prompt->Message = Message;
 	Prompt->ConfirmMessage = ConfirmMessage;
@@ -342,6 +374,10 @@ UKzUserWidget* UKzUserWidget::CreateSlottedDynamicChild(UPanelWidget* Panel, TSu
 	}
 
 	UKzUserWidget* Content = CreateWidget<UKzUserWidget>(this, ContentClass.Get());
+	if (!Content)
+	{
+		return nullptr;
+	}
 	Content->SetOwningLocalPlayer(GetOwningLocalPlayer());
 	AddSlottedDynamicChild(Panel, Content);
 	return Content;
@@ -377,7 +413,7 @@ void UKzUserWidget::AttachChild(UKzUserWidget* Content)
 	UKzUserWidget* OldChild = ChildWidget;
 	if (OldChild && OldChild != Content)
 	{
-		ClearChild();
+		DetachChild();
 		OldChild->RemoveFromStack(false);
 	}
 
@@ -390,7 +426,7 @@ void UKzUserWidget::ReleaseModalLinks(bool bPropagate)
 {
 	if (UKzUserWidget* Child = ChildWidget)
 	{
-		ClearChild();
+		DetachChild();
 		Child->RemoveFromStack(false);
 	}
 
@@ -410,6 +446,14 @@ void UKzUserWidget::ClearChild()
 {
 	if (ChildWidget != nullptr)
 	{
+		ChildWidget->RemoveFromStack(false);
+	}
+}
+
+void UKzUserWidget::DetachChild()
+{
+	if (ChildWidget != nullptr)
+	{
 		ChildWidget->ModalOwner.Reset();
 		ChildWidget = nullptr;
 		ClearInput();
@@ -418,7 +462,7 @@ void UKzUserWidget::ClearChild()
 
 void UKzUserWidget::OnChildRemoved(UKzUserWidget* Child, bool bPropagate)
 {
-	ClearChild();
+	DetachChild();
 
 	if (VisibilityBeforeChild.IsSet())
 	{

@@ -8,6 +8,7 @@
 
 class FWeakWidgetPath;
 class FWidgetPath;
+struct FStreamableHandle;
 class SWidget;
 class UWidget;
 struct FFocusEvent;
@@ -51,6 +52,9 @@ private:
 
 	/** This player's focus when the app went to the background: activating the window hands every user the keyboard user's focus. */
 	TWeakPtr<SWidget> FocusOnDeactivate;
+
+	/** Keeps the project prompt class loaded, so ShowPrompt does not load it synchronously mid game. */
+	TSharedPtr<FStreamableHandle> PromptClassHandle;
 
 public:
 	UPROPERTY(Category = KzUI, BlueprintAssignable)

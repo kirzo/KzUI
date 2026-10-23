@@ -7,14 +7,17 @@
 #include "KzUIInputSettings.h"
 #include "KzUISoundTheme.h"
 #include "KzUIIconTheme.h"
+#include "KzPromptWidget.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Containers/Ticker.h"
+#include "Engine/AssetManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Console.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/StreamableManager.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
@@ -162,6 +165,12 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			return false;
 		}
 	));
+
+	const TSoftClassPtr<UKzPromptWidget>& PromptClass = UKzUIInputSettings::Get()->PromptClass;
+	if (!PromptClass.IsNull())
+	{
+		PromptClassHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(PromptClass.ToSoftObjectPath());
+	}
 
 	if (FSlateApplication::IsInitialized())
 	{
