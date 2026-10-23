@@ -76,6 +76,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UKzUserWidget> ChildWidget;
 
+	/** Widget this one is the modal child of. */
+	TWeakObjectPtr<UKzUserWidget> ModalOwner;
+
 	/** Visibility to restore when the child opened with bHideWhileOpen is removed. */
 	TOptional<ESlateVisibility> VisibilityBeforeChild;
 
@@ -214,6 +217,12 @@ protected:
 	EKzUIInputResult FireInputTriggered(const EKzUIInputType Input);
 
 private:
+	/** Makes Content the modal child, removing the one it replaces. */
+	void AttachChild(UKzUserWidget* Content);
+
+	/** Removes the modal child and hands control back to the owner, if this is a modal child. */
+	void ReleaseModalLinks(bool bPropagate);
+
 	EKzUIInputResult FireInputReleased(const EKzUIInputType Input);
 
 	/** FireInputTriggered for a key press, recording whether the press was consumed. */

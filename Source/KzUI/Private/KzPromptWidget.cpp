@@ -70,9 +70,9 @@ void UKzPromptWidget::BackInputTriggered_Implementation(bool Handled)
 	if (Handled)
 	{
 		// With the confirm option highlighted, Back moves the selection to cancel instead of dismissing
-		if (IsValid(HoveredOption) && HoveredOption == ConfirmText)
+		if (IsValid(HoveredOption) && HoveredOption == ConfirmText && Options.Contains(CancelText.Get()))
 		{
-			RightInputTriggered(true);
+			HoverWidget(CancelText);
 		}
 		else
 		{
@@ -85,7 +85,20 @@ void UKzPromptWidget::BackInputTriggered_Implementation(bool Handled)
 //~ Begin UKzNavigableWidget Interface
 TArray<UWidget*> UKzPromptWidget::GetOptions_Implementation() const
 {
-	return bIsNavigable ? TArray<UWidget*>({ ConfirmText, CancelText }) : TArray<UWidget*>();
+	// An option without a message is not on offer
+	TArray<UWidget*> Result;
+	if (bIsNavigable)
+	{
+		if (!ConfirmMessage.IsEmpty())
+		{
+			Result.Add(ConfirmText);
+		}
+		if (!CancelMessage.IsEmpty())
+		{
+			Result.Add(CancelText);
+		}
+	}
+	return Result;
 }
 
 UWidget* UKzPromptWidget::GetDefaultOption_Implementation() const
@@ -111,6 +124,10 @@ void UKzPromptWidget::Confirm()
 {
 	SetInputEnabled(false);
 	PlaySelectSound();
+	if (bCloseOnResult)
+	{
+		RemoveFromStack(false);
+	}
 	ReceiveOnConfirm();
 	OnConfirm.Delegate.ExecuteIfBound();
 }
@@ -119,6 +136,10 @@ void UKzPromptWidget::Cancel()
 {
 	SetInputEnabled(false);
 	Super::PlayInputSound(EKzUIInputType::Back);
+	if (bCloseOnResult)
+	{
+		RemoveFromStack(false);
+	}
 	ReceiveOnCancel();
 	OnCancel.Delegate.ExecuteIfBound();
 }

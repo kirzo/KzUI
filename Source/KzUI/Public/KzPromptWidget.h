@@ -14,8 +14,13 @@ class KZUI_API UKzPromptWidget : public UKzNavigableWidget
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(Category = "KzUI|Prompt", BlueprintReadOnly)
+	/** Without it there are no options to move between: Accept confirms and Back cancels. */
+	UPROPERTY(Category = "KzUI|Prompt", EditAnywhere, BlueprintReadOnly)
 	bool bIsNavigable = true;
+
+	/** Confirm and Cancel remove the prompt before their events fire. Off, the events remove it themselves, e.g. after an outro animation. */
+	UPROPERTY(Category = "KzUI|Prompt", EditAnywhere, BlueprintReadOnly)
+	bool bCloseOnResult = true;
 
 	UPROPERTY(Category = "KzUI|Prompt", BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> MessageText;

@@ -110,6 +110,9 @@ void UKzUserWidget::OnActivated()
 
 void UKzUserWidget::NativeDestruct()
 {
+	// Removals that skip RemoveFromParent, like clearing the panel that holds the widget, still close the modal chain
+	ReleaseModalLinks(false);
+
 	if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
 	{
 		Subsystem->UnregisterWidget(this);
@@ -276,6 +279,7 @@ void UKzUserWidget::RemoveFromStack(bool bPropagate)
 		ReceiveOnRemoveFromParent();
 		OnRemovedFromParent.Broadcast(this, bPropagate);
 		SetInputEnabled(false);
+		ReleaseModalLinks(bPropagate);
 	}
 	Super::RemoveFromParent();
 }
@@ -300,7 +304,6 @@ void UKzUserWidget::AddDynamicChild(UKzUserWidget* Content, int32 ZOrder, bool b
 		return;
 	}
 
-	ClearChild();
 	Content->AddToViewport(ZOrder);
 
 	// A child that closed itself while constructing never becomes the modal
@@ -309,9 +312,7 @@ void UKzUserWidget::AddDynamicChild(UKzUserWidget* Content, int32 ZOrder, bool b
 		return;
 	}
 
-	ChildWidget = Content;
-	Content->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
-	Content->SetFocus();
+	AttachChild(Content);
 
 	// IsSet guards replacing one hiding child with another: the visibility to restore is
 	// the one from before the first of them
@@ -363,7 +364,6 @@ void UKzUserWidget::AddSlottedDynamicChild(UPanelWidget* Panel, UKzUserWidget* C
 		return;
 	}
 
-	ClearChild();
 	UPanelSlot* ReturnSlot = Panel->AddChild(Content);
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(ReturnSlot))
 	{
@@ -377,10 +377,38 @@ void UKzUserWidget::AddSlottedDynamicChild(UPanelWidget* Panel, UKzUserWidget* C
 		return;
 	}
 
-	ChildWidget = Content;
-	Content->OnRemovedFromParent.AddDynamic(this, &UKzUserWidget::OnChildRemoved);
-	Content->SetFocus();
+	AttachChild(Content);
 	OnAddChild(Content);
+}
+
+void UKzUserWidget::AttachChild(UKzUserWidget* Content)
+{
+	// The replaced child leaves without OnChildRemoved: the hidden visibility and the focus carry over to the new one
+	UKzUserWidget* OldChild = ChildWidget;
+	if (OldChild && OldChild != Content)
+	{
+		ClearChild();
+		OldChild->RemoveFromStack(false);
+	}
+
+	ChildWidget = Content;
+	Content->ModalOwner = this;
+	Content->SetFocus();
+}
+
+void UKzUserWidget::ReleaseModalLinks(bool bPropagate)
+{
+	if (UKzUserWidget* Child = ChildWidget)
+	{
+		ClearChild();
+		Child->RemoveFromStack(false);
+	}
+
+	if (UKzUserWidget* Owner = ModalOwner.Get())
+	{
+		ModalOwner.Reset();
+		Owner->OnChildRemoved(this, bPropagate);
+	}
 }
 
 void UKzUserWidget::OnAddChild(UKzUserWidget* Child)
@@ -392,7 +420,7 @@ void UKzUserWidget::ClearChild()
 {
 	if (ChildWidget != nullptr)
 	{
-		ChildWidget->OnRemovedFromParent.RemoveDynamic(this, &UKzUserWidget::OnChildRemoved);
+		ChildWidget->ModalOwner.Reset();
 		ChildWidget = nullptr;
 		ClearInput();
 	}
