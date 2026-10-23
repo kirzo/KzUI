@@ -274,6 +274,8 @@ void UKzNavigableWidget::PlayInputSound(EKzUIInputType Input)
 		case EKzUIInputType::Right:
 		case EKzUIInputType::Previous:
 		case EKzUIInputType::Next:
+		// Accept sounds as the selection it commits, or as the action of the option that claimed it
+		case EKzUIInputType::Accept:
 			return;
 		default:
 			Super::PlayInputSound(Input);

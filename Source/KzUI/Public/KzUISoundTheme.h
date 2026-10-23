@@ -23,7 +23,7 @@ public:
 	UPROPERTY(Category = Sound, EditAnywhere)
 	TObjectPtr<USoundBase> HoverSound;
 
-	/** Sound played when a navigable widget commits a new selection, by mouse, Accept or SelectOption. Plays in addition to any Accept entry of InputSounds. */
+	/** Sound played when a navigable widget commits a new selection, by mouse, Accept or SelectOption, or when its hovered option acts on Accept. On navigable widgets it replaces the Accept entry of InputSounds. */
 	UPROPERTY(Category = Sound, EditAnywhere)
 	TObjectPtr<USoundBase> SelectSound;
 };
