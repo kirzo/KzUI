@@ -10,8 +10,6 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogKzUI, Log, All);
-
 void UKzInputIcon::SetInput(EKzUIInputType NewInput)
 {
 	Input = NewInput;

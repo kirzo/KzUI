@@ -15,8 +15,6 @@
 #include "Sound/SoundBase.h"
 #include "Widgets/SViewport.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogKzUI, Log, All);
-
 namespace
 {
 	// Timing for switcher children that are not UKzSplashPage

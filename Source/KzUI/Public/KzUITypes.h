@@ -6,6 +6,8 @@
 #include "InputCoreTypes.h"
 #include "KzUITypes.generated.h"
 
+KZUI_API DECLARE_LOG_CATEGORY_EXTERN(LogKzUI, Log, All);
+
 UENUM(BlueprintType, meta = (Bitflags))
 enum class EKzUIInputType : uint8
 {

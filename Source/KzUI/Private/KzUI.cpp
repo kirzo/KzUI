@@ -4,6 +4,8 @@
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "Modules/ModuleManager.h"
 
+DEFINE_LOG_CATEGORY(LogKzUI);
+
 class FKzUIModule : public IModuleInterface
 {
 public:
