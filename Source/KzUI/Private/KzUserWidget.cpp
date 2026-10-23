@@ -9,6 +9,7 @@
 
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 
@@ -198,8 +199,6 @@ FCursorReply UKzUserWidget::NativeOnCursorQuery(const FGeometry& InGeometry, con
 
 void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
-	LifeTime += InDeltaTime;
-
 	// Input taken away mid press (console opened, suspended, a child took over) cancels it
 	if (!IsInputEnabled())
 	{
@@ -210,14 +209,13 @@ void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
 	for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
 	{
-		FKzUIInputPressedState* State = InputPressedState.Find(Input);
+		const FKzUIInputPressedState* State = InputPressedState.Find(Input);
 		if (!State)
 		{
 			continue;
 		}
 
-		State->Time += InDeltaTime;
-		const float HeldTime = State->Time;
+		const float HeldTime = State->GetHeldTime();
 
 		// Unsupported inputs are tracked for chords but fire nothing
 		if (!SupportsInput(Input))
@@ -234,14 +232,7 @@ void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		}
 
 		InputHeld[Input](bHandled, HeldTime);
-		State = InputPressedState.Find(Input);
-
-		const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
-		if (State && Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && !State->bTriggerFired && State->Time >= Trigger->HoldTime)
-		{
-			State->bTriggerFired = true;
-			FireInputTriggered(Input);
-		}
+		FireHoldIfDue(Input);
 	}
 
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -454,8 +445,6 @@ void UKzUserWidget::SetInputEnabled(const bool bNewEnabled)
 
 		if (bInputEnabled)
 		{
-			LifeTime = 0.0f;
-
 			// A widget switched on later than its construct may now be the one that should hold the focus
 			if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
 			{
@@ -523,7 +512,7 @@ bool UKzUserWidget::IsInputPressed(const EKzUIInputType Input) const
 
 float UKzUserWidget::GetInputHeldTime(const EKzUIInputType Input) const
 {
-	return IsInputPressed(Input) ? InputPressedState[Input].Time : 0.0f;
+	return IsInputPressed(Input) ? InputPressedState[Input].GetHeldTime() : 0.0f;
 }
 
 float UKzUserWidget::GetInputHoldProgress(const EKzUIInputType Input) const
@@ -537,7 +526,7 @@ float UKzUserWidget::GetInputHoldProgress(const EKzUIInputType Input) const
 	const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
 	if (Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && Trigger->HoldTime > 0.0f)
 	{
-		return FMath::Clamp(State->Time / Trigger->HoldTime, 0.0f, 1.0f);
+		return FMath::Clamp(State->GetHeldTime() / Trigger->HoldTime, 0.0f, 1.0f);
 	}
 	return 1.0f;
 }
@@ -628,8 +617,16 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 	// Repeats and extra keys of a held input go wherever its first press went
 	if (bWasPressed)
 	{
-		return State.bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Ignored;
+		const EKzUIInputResult Result = State.bConsumed ? EKzUIInputResult::Handled : EKzUIInputResult::Ignored;
+
+		// Repeats also check the hold, for widgets that do not tick
+		if (SupportsInput(Input))
+		{
+			FireHoldIfDue(Input);
+		}
+		return Result;
 	}
+	State.StartTime = FSlateApplication::Get().GetCurrentTime();
 	if (!SupportsInput(Input))
 	{
 		return EKzUIInputResult::Ignored;
@@ -640,15 +637,15 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 	{
 		case EKzUIInputTrigger::DoubleTap:
 		{
-			const float* LastTap = LastTapTime.Find(Input);
-			if (LastTap && LifeTime - *LastTap <= Trigger->TapInterval)
+			const double* LastTap = LastTapTime.Find(Input);
+			if (LastTap && State.StartTime - *LastTap <= Trigger->TapInterval)
 			{
 				LastTapTime.Remove(Input);
 				State.bTriggerFired = true;
 				return FirePressTriggered(Input);
 			}
 			// The first tap is not consumed: the key keeps working for the game
-			LastTapTime.Add(Input, LifeTime);
+			LastTapTime.Add(Input, State.StartTime);
 			return EKzUIInputResult::Unhandled;
 		}
 		case EKzUIInputTrigger::Chord:
@@ -674,6 +671,22 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 			State.bTriggerFired = true;
 			return FirePressTriggered(Input);
 		}
+	}
+}
+
+float FKzUIInputPressedState::GetHeldTime() const
+{
+	return static_cast<float>(FSlateApplication::Get().GetCurrentTime() - StartTime);
+}
+
+void UKzUserWidget::FireHoldIfDue(const EKzUIInputType Input)
+{
+	FKzUIInputPressedState* State = InputPressedState.Find(Input);
+	const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
+	if (State && Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && !State->bTriggerFired && State->GetHeldTime() >= Trigger->HoldTime)
+	{
+		State->bTriggerFired = true;
+		FireInputTriggered(Input);
 	}
 }
 

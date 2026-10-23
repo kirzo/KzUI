@@ -13,11 +13,14 @@ class UKzUserWidget;
 
 struct FKzUIInputPressedState
 {
-	float Time = 0.0f;
+	/** Slate application time of the first key down, so holds keep counting while the widget is hidden or does not tick. */
+	double StartTime = 0.0;
 	bool bTriggerFired = false;
 	/** Whether the first key down was consumed: its repeats and its release go the same way, so the game never sees half a press. */
 	bool bConsumed = false;
 	TArray<FKey> Keys;
+
+	float GetHeldTime() const;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FKzUserWidgetRemovedSignature, UKzUserWidget*, Child, bool, bPropagate);
@@ -69,8 +72,6 @@ public:
 private:
 	bool bInputEnabled = false;
 
-	float LifeTime = 0.0f;
-
 	TMap<EKzUIInputType, FKzUIInputPressedState> InputPressedState;
 
 	UPROPERTY(Transient)
@@ -88,7 +89,8 @@ private:
 	/** Triggers replaced on this instance through OverrideInputTrigger; every other input uses the project settings. */
 	TMap<EKzUIInputType, FKzUIInputTriggerConfig> TriggerOverrides;
 
-	TMap<EKzUIInputType, float> LastTapTime;
+	/** Slate application time of the first tap of each DoubleTap input. */
+	TMap<EKzUIInputType, double> LastTapTime;
 
 	TMap<EKzUIInputType, TFunction<bool()>> CanHandleInputFunc;
 	TMap<EKzUIInputType, TFunction<void(bool)>> InputTriggered;
@@ -232,6 +234,9 @@ private:
 
 	/** FireInputTriggered for a key press, recording whether the press was consumed. */
 	EKzUIInputResult FirePressTriggered(const EKzUIInputType Input);
+
+	/** Fires a Hold trigger whose time is up. Checked on tick and on key repeats. */
+	void FireHoldIfDue(const EKzUIInputType Input);
 
 	/** Family of the owning player's last pad, which picks the gamepad key overrides. */
 	EKzUIInputDevice GetGamepadDevice() const;
