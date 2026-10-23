@@ -5,6 +5,7 @@
 #include "KzUserWidget.h"
 #include "KzSplashWidget.generated.h"
 
+class UAudioComponent;
 class UKzSplashPage;
 class UWidgetSwitcher;
 
@@ -58,6 +59,9 @@ private:
 	float StateTime = 0.0f;
 	float FadeOutStartOpacity = 1.0f;
 	int32 PageIndex = INDEX_NONE;
+
+	/** Sound of the current page, faded out when the page is skipped. */
+	TWeakObjectPtr<UAudioComponent> PageSound;
 
 	TSharedPtr<class FKzSplashInputListener> InputListener;
 };

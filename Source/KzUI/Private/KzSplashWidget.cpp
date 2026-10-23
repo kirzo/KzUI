@@ -4,6 +4,7 @@
 #include "KzSplashPage.h"
 #include "KzUIInputSettings.h"
 
+#include "Components/AudioComponent.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
@@ -172,6 +173,10 @@ void UKzSplashWidget::NativeDestruct()
 		}
 		InputListener.Reset();
 	}
+	if (UAudioComponent* Sound = PageSound.Get())
+	{
+		Sound->Stop();
+	}
 	Super::NativeDestruct();
 }
 
@@ -185,8 +190,9 @@ void UKzSplashWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		return;
 	}
 
+	// Capped so the hitch of the first frames after a load does not swallow a fade-in or a whole hold
 	const UKzSplashPage* Config = GetCurrentSplashPage();
-	StateTime += InDeltaTime;
+	StateTime += FMath::Min(InDeltaTime, 0.1f);
 
 	switch (State)
 	{
@@ -238,6 +244,12 @@ bool UKzSplashWidget::Skip()
 	}
 
 	BeginFadeOut();
+
+	// A page that plays out keeps its sound to the end; a skipped one takes it along in its fade
+	if (UAudioComponent* Sound = PageSound.Get())
+	{
+		Sound->FadeOut(Config ? Config->FadeOutTime : DefaultFadeTime, 0.0f);
+	}
 	return true;
 }
 
@@ -253,6 +265,7 @@ void UKzSplashWidget::StartPage(int32 Index)
 	Pages->SetActiveWidgetIndex(Index);
 	State = EKzSplashState::FadeIn;
 	StateTime = 0.0f;
+	PageSound.Reset();
 
 	UWidget* Page = Pages->GetChildAt(Index);
 	if (UKzSplashPage* SplashPage = Cast<UKzSplashPage>(Page))
@@ -260,7 +273,7 @@ void UKzSplashWidget::StartPage(int32 Index)
 		Page->SetRenderOpacity(SplashPage->FadeInTime > 0.0f ? 0.0f : 1.0f);
 		if (SplashPage->Sound)
 		{
-			UGameplayStatics::PlaySound2D(this, SplashPage->Sound);
+			PageSound = UGameplayStatics::SpawnSound2D(this, SplashPage->Sound);
 		}
 		SplashPage->OnShown.Broadcast();
 	}
