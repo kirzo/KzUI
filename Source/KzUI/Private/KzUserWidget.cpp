@@ -75,12 +75,10 @@ bool UKzUserWidget::Initialize()
 
 void UKzUserWidget::NativeConstruct()
 {
-	for (const auto& Pair : UKzUIInputSettings::Get()->InputMap)
-	{
-		TriggerMap.Add(Pair.Key, Pair.Value.TriggerConfig);
-	}
-
 	SetInputEnabled(bStartWithInputEnabled);
+
+	// Blueprint Construct runs before OnActivated, which may rely on what it set up
+	Super::NativeConstruct();
 
 	// Pages of a KzWidgetSwitcher register when the switcher activates them, not on construct
 	bool bOnActivePage = true;
@@ -93,8 +91,6 @@ void UKzUserWidget::NativeConstruct()
 		}
 		OnActivated();
 	}
-
-	Super::NativeConstruct();
 }
 
 void UKzUserWidget::OnActivated()
@@ -106,6 +102,9 @@ void UKzUserWidget::NativeDestruct()
 {
 	// Removals that skip RemoveFromParent, like clearing the panel that holds the widget, still close the modal chain
 	ReleaseModalLinks(false);
+
+	// A widget added again later starts with no press in flight
+	ClearInput();
 
 	if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
 	{
@@ -237,7 +236,7 @@ void UKzUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		InputHeld[Input](bHandled, HeldTime);
 		State = InputPressedState.Find(Input);
 
-		const FKzUIInputTriggerConfig* Trigger = TriggerMap.Find(Input);
+		const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
 		if (State && Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && !State->bTriggerFired && State->Time >= Trigger->HoldTime)
 		{
 			State->bTriggerFired = true;
@@ -535,12 +534,23 @@ float UKzUserWidget::GetInputHoldProgress(const EKzUIInputType Input) const
 		return 0.0f;
 	}
 
-	const FKzUIInputTriggerConfig Trigger = TriggerMap.FindRef(Input);
-	if (Trigger.Trigger == EKzUIInputTrigger::Hold && Trigger.HoldTime > 0.0f)
+	const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
+	if (Trigger && Trigger->Trigger == EKzUIInputTrigger::Hold && Trigger->HoldTime > 0.0f)
 	{
-		return FMath::Clamp(State->Time / Trigger.HoldTime, 0.0f, 1.0f);
+		return FMath::Clamp(State->Time / Trigger->HoldTime, 0.0f, 1.0f);
 	}
 	return 1.0f;
+}
+
+const FKzUIInputTriggerConfig* UKzUserWidget::FindTriggerConfig(EKzUIInputType Input) const
+{
+	if (const FKzUIInputTriggerConfig* Override = TriggerOverrides.Find(Input))
+	{
+		return Override;
+	}
+
+	const FKzUIInputData* Data = UKzUIInputSettings::Get()->InputMap.Find(Input);
+	return Data ? &Data->TriggerConfig : nullptr;
 }
 
 EKzUIInputDevice UKzUserWidget::GetGamepadDevice() const
@@ -581,10 +591,7 @@ bool UKzUserWidget::IsInputMappedToKey(EKzUIInputType Input, const FKey& Key) co
 void UKzUserWidget::ResetInputMap(EKzUIInputType Input)
 {
 	InputMapOverrides.Remove(Input);
-	if (const FKzUIInputData* Data = UKzUIInputSettings::Get()->InputMap.Find(Input))
-	{
-		TriggerMap.Add(Input, Data->TriggerConfig);
-	}
+	TriggerOverrides.Remove(Input);
 }
 
 void UKzUserWidget::OverrideInputMap(const EKzUIInputType Input, TArray<FKey> Keys)
@@ -595,7 +602,7 @@ void UKzUserWidget::OverrideInputMap(const EKzUIInputType Input, TArray<FKey> Ke
 
 void UKzUserWidget::OverrideInputTrigger(const EKzUIInputType Input, const FKzUIInputTriggerConfig& Config)
 {
-	TriggerMap.Add(Input, Config);
+	TriggerOverrides.Add(Input, Config);
 	InputPressedState.Remove(Input);
 }
 
@@ -628,7 +635,7 @@ EKzUIInputResult UKzUserWidget::ProcessInputPressed(const EKzUIInputType Input, 
 		return EKzUIInputResult::Ignored;
 	}
 
-	const FKzUIInputTriggerConfig* Trigger = TriggerMap.Find(Input);
+	const FKzUIInputTriggerConfig* Trigger = FindTriggerConfig(Input);
 	switch (Trigger ? Trigger->Trigger : EKzUIInputTrigger::Press)
 	{
 		case EKzUIInputTrigger::DoubleTap:
@@ -724,7 +731,12 @@ EKzUIInputResult UKzUserWidget::FireInputTriggered(const EKzUIInputType Input)
 	}
 
 	AnyInputTriggered(Input, bHandled);
-	InputTriggered[Input](bHandled);
+
+	// Any Input Triggered may have removed the widget or opened a child over it
+	if (IsInputEnabled())
+	{
+		InputTriggered[Input](bHandled);
+	}
 	return bHandled ? EKzUIInputResult::Handled : EKzUIInputResult::Unhandled;
 }
 

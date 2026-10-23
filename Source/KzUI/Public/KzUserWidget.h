@@ -85,7 +85,8 @@ private:
 	/** Keys replaced on this instance through OverrideInputMap. Every other input resolves from the project settings on each lookup, so it follows the player's pad. */
 	TMap<EKzUIInputType, FKzUIInputDefinition> InputMapOverrides;
 
-	TMap<EKzUIInputType, FKzUIInputTriggerConfig> TriggerMap;
+	/** Triggers replaced on this instance through OverrideInputTrigger; every other input uses the project settings. */
+	TMap<EKzUIInputType, FKzUIInputTriggerConfig> TriggerOverrides;
 
 	TMap<EKzUIInputType, float> LastTapTime;
 
@@ -194,7 +195,7 @@ public:
 	UFUNCTION(Category = "KzUI|Input", BlueprintPure)
 	bool IsInputMappedToKey(EKzUIInputType Input, const FKey& Key) const;
 
-	/** Restores the project-settings key map for the given input. */
+	/** Restores the project-settings keys and trigger for the given input. */
 	UFUNCTION(Category = "KzUI|Input", BlueprintCallable)
 	void ResetInputMap(EKzUIInputType Input);
 
@@ -237,6 +238,9 @@ private:
 
 	/** This instance's override, or the project settings resolved for the owning player's pad. */
 	FKzUIInputDefinition GetInputDefinition(EKzUIInputType Input) const;
+
+	/** This instance's override, or the project settings. */
+	const FKzUIInputTriggerConfig* FindTriggerConfig(EKzUIInputType Input) const;
 
 public:
 

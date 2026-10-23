@@ -393,7 +393,8 @@ UWidget* UKzNavigableWidget::GetTargetWidget(UWidget* Source, EKzUIInputType Inp
 		return nullptr;
 	}
 
-	// Explicit designer rules win, following chains through non-selectable widgets (Visited guards cycles)
+	// Explicit designer rules win, following chains through non-selectable widgets and widgets that
+	// are not options of this one (Visited guards cycles)
 	TSet<UWidget*> Visited;
 	UWidget* Current = Source;
 	while (Current)
@@ -404,7 +405,7 @@ UWidget* UKzNavigableWidget::GetTargetWidget(UWidget* Source, EKzUIInputType Inp
 		{
 			break;
 		}
-		if (IsWidgetSelectable(Target))
+		if (Options.Contains(Target) && IsWidgetSelectable(Target))
 		{
 			return Target;
 		}
@@ -433,6 +434,9 @@ UWidget* UKzNavigableWidget::FindGeometricTarget(UWidget* Source, EKzUIInputType
 	const FGeometry& SourceGeometry = Source->GetCachedGeometry();
 	const FVector2D Center = SourceGeometry.GetAbsolutePosition() + SourceGeometry.GetAbsoluteSize() * 0.5f;
 
+	// Ahead means past the source's own edge, so a neighbour in the same row a pixel lower is not "below"
+	const float HalfExtent = FMath::Abs(FVector2D::DotProduct(SourceGeometry.GetAbsoluteSize() * 0.5f, Direction));
+
 	// Nearest option ahead, penalizing perpendicular drift. With loop enabled, the farthest
 	// option behind (same scoring, negative axis) is the wrap-around target.
 	UWidget* BestAhead = nullptr;
@@ -452,12 +456,12 @@ UWidget* UKzNavigableWidget::FindGeometricTarget(UWidget* Source, EKzUIInputType
 		const float Along = FVector2D::DotProduct(Delta, Direction);
 		const float Score = Along + FMath::Abs(FVector2D::CrossProduct(Delta, Direction)) * 2.0f;
 
-		if (Along > UE_KINDA_SMALL_NUMBER && Score < BestAheadScore)
+		if (Along > HalfExtent && Score < BestAheadScore)
 		{
 			BestAhead = Option;
 			BestAheadScore = Score;
 		}
-		else if (Along < -UE_KINDA_SMALL_NUMBER && bLoopNavigation && Score < BestBehindScore)
+		else if (Along < -HalfExtent && bLoopNavigation && Score < BestBehindScore)
 		{
 			BestBehind = Option;
 			BestBehindScore = Score;
