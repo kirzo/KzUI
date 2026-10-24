@@ -8,6 +8,7 @@
 #include "KzTextBlock.generated.h"
 
 class IBreakIterator;
+class STextBlock;
 class SWrapBox;
 class UKzInputIcon;
 class UKzTextBlockStyle;
@@ -138,6 +139,9 @@ private:
 	void RebuildContent();
 	void AddTextSegment(FString& Pending);
 	void AddTextBlock(const FString& Word);
+
+	/** STextBlock with this widget's live font, colour and shadow. */
+	TSharedRef<STextBlock> MakeTextWidget(const TAttribute<FText>& Text);
 	void AddIcon(EKzUIInputType Input, FName CustomToken, FName Variation, int32 SpacesBefore, int32 SpacesAfter);
 	const UKzUIIconTheme* GetActiveIconTheme() const;
 

@@ -62,12 +62,14 @@ void UKzInputIcon::RefreshIcon()
 {
 	// Without a player, the project theme and the platform's own pad, which is where a new player starts
 	EKzUIInputDevice Device = UKzUIInputSubsystem::GetPlatformGamepadDevice();
+	EKzUIInputDevice GamepadDevice = Device;
 	const UKzUIIconTheme* Theme = nullptr;
 
 #if WITH_EDITOR
 	if (IsDesignTime())
 	{
 		Device = PreviewDevice;
+		GamepadDevice = PreviewDevice != EKzUIInputDevice::Keyboard ? PreviewDevice : GamepadDevice;
 		Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
 	}
 	else
@@ -75,6 +77,7 @@ void UKzInputIcon::RefreshIcon()
 	if (const UKzUIInputSubsystem* Subsystem = BindPlayerSubsystem())
 	{
 		Device = Subsystem->GetCurrentInputDevice();
+		GamepadDevice = Subsystem->GetGamepadDevice();
 		Theme = Subsystem->GetIconTheme();
 	}
 	else
@@ -82,9 +85,20 @@ void UKzInputIcon::RefreshIcon()
 		Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
 	}
 
+	FallbackText = FText::GetEmpty();
 	UObject* Icon = !Theme ? nullptr : CustomToken.IsNone() ? Theme->GetIcon(Input, Device) : Theme->GetCustomIcon(CustomToken, Device);
 	if (!Icon)
 	{
+		// The name of the key that fires the input on this device stands in, for a KzTextBlock to show
+		const FKzUIInputDefinition* Definition = CustomToken.IsNone() ? UKzUIInputSettings::Get()->FindInputDefinition(Input, GamepadDevice) : nullptr;
+		for (const FKey& Key : Definition ? Definition->GetKeys() : TArray<FKey>())
+		{
+			if (Key.IsGamepadKey() == (Device != EKzUIInputDevice::Keyboard))
+			{
+				FallbackText = Key.GetDisplayName();
+				break;
+			}
+		}
 		ClearIcon();
 		return;
 	}

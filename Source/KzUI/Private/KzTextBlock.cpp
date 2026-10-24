@@ -16,6 +16,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
 // Wrap width used to render as a single line: larger than any real allotment
@@ -480,20 +481,25 @@ void UKzTextBlock::AddTextSegment(FString& Pending)
 
 void UKzTextBlock::AddTextBlock(const FString& Word)
 {
-	// Appearance is read live, so setters, styles and UMG animations apply without a rebuild
-	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
 	MyBox->AddSlot()
 	.ForceNewLine(TakeNewLine())
 	.VAlign(VAlign_Center)
 	[
-		SNew(STextBlock)
-		.Text(FText::FromString(Word))
+		MakeTextWidget(FText::FromString(Word))
+	];
+}
+
+TSharedRef<STextBlock> UKzTextBlock::MakeTextWidget(const TAttribute<FText>& Text)
+{
+	// Appearance is read live, so setters, styles and UMG animations apply without a rebuild
+	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
+	return SNew(STextBlock)
+		.Text(Text)
 		.Font_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetFont() : FSlateFontInfo(); })
 		.ColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetColorAndOpacity() : FSlateColor(); })
 		.ShadowOffset_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetShadowOffset() : FVector2D::ZeroVector; })
 		.ShadowColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetShadowColorAndOpacity() : FLinearColor::Transparent; })
-		.TransformPolicy(GetTextTransformPolicy())
-	];
+		.TransformPolicy(GetTextTransformPolicy());
 }
 
 void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variation, int32 SpacesBefore, int32 SpacesAfter)
@@ -553,6 +559,27 @@ void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variat
 				Content
 			];
 	}
+
+	// A device the theme has no icon for shows the name of the key instead
+	const auto HasIcon = [WeakIcon]() { return WeakIcon.IsValid() && !WeakIcon->GetNaturalSize().IsZero(); };
+	Content = SNew(SOverlay)
+		+ SOverlay::Slot()
+		[
+			SNew(SBox)
+			.Visibility_Lambda([HasIcon]() { return HasIcon() ? EVisibility::Visible : EVisibility::Collapsed; })
+			[
+				Content
+			]
+		]
+		+ SOverlay::Slot()
+		.VAlign(VAlign_Center)
+		[
+			SNew(SBox)
+			.Visibility_Lambda([HasIcon]() { return HasIcon() ? EVisibility::Collapsed : EVisibility::Visible; })
+			[
+				MakeTextWidget(TAttribute<FText>::CreateLambda([WeakIcon]() { return WeakIcon.IsValid() ? WeakIcon->GetFallbackText() : FText::GetEmpty(); }))
+			]
+		];
 
 	// Spaces become padding measured in the live font
 	MyBox->AddSlot()

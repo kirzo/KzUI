@@ -16,13 +16,20 @@ struct KZUI_API FKzUIIcon
 	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses = "/Script/Engine.Texture2D,/Script/Engine.MaterialInterface,/Script/KzUI.KzUIFlipbook"))
 	TObjectPtr<UObject> Default;
 
-	/** Per-device replacements for Default. */
+	/** Per-device replacements for Default. A DualSense without its own entry uses the DualShock one, and the other way round. */
 	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly, meta = (AllowedClasses = "/Script/Engine.Texture2D,/Script/Engine.MaterialInterface,/Script/KzUI.KzUIFlipbook"))
 	TMap<EKzUIInputDevice, TObjectPtr<UObject>> Overrides;
 
 	UObject* Resolve(EKzUIInputDevice Device) const
 	{
-		UObject* Icon = Overrides.FindRef(Device);
+		if (UObject* Icon = Overrides.FindRef(Device))
+		{
+			return Icon;
+		}
+
+		// Both PlayStation pads have the same face buttons, so one's icons stand in for the other's
+		const EKzUIInputDevice Sibling = Device == EKzUIInputDevice::DualSense ? EKzUIInputDevice::DualShock : Device == EKzUIInputDevice::DualShock ? EKzUIInputDevice::DualSense : Device;
+		UObject* Icon = Sibling != Device ? Overrides.FindRef(Sibling) : nullptr;
 		return Icon ? Icon : Default.Get();
 	}
 };
