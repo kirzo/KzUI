@@ -10,6 +10,7 @@
 #include "Blueprint/WidgetNavigation.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/ScrollBox.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -30,6 +31,19 @@ static bool IsWidgetVisible(UWidget* Widget)
 static bool IsWidgetSelectable(UWidget* Widget)
 {
 	return Widget->GetIsEnabled() && IsWidgetVisible(Widget) && (!Widget->Implements<UKzSelectableWidgetInterface>() || IKzSelectableWidgetInterface::Execute_IsSelectable(Widget));
+}
+
+/** Scrolls the nearest ScrollBox holding Option until it is in view, so navigating never leaves the hover off screen. */
+static void ScrollIntoView(UWidget* Option)
+{
+	for (UWidget* Parent = Option ? Option->GetParent() : nullptr; Parent; Parent = Parent->GetParent())
+	{
+		if (UScrollBox* ScrollBox = Cast<UScrollBox>(Parent))
+		{
+			ScrollBox->ScrollWidgetIntoView(Option, true, EDescendantScrollDestination::IntoView);
+			return;
+		}
+	}
 }
 
 static bool CanSelectOption(UWidget* Widget)
@@ -220,6 +234,7 @@ void UKzNavigableWidget::HandleNavigationInput(EKzUIInputType Input, bool Handle
 			return;
 		}
 		HoverWidget(GetTargetWidget(HoveredOption, Input));
+		ScrollIntoView(HoveredOption);
 	}
 	else if (HoveredOption && !GetTargetWidget(HoveredOption, Input))
 	{
