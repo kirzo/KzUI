@@ -41,6 +41,14 @@ void UKzOptionWidget::SetUnavailableReason(const FText& Reason)
 	}
 }
 
+void UKzOptionWidget::MarkUnsupported(EKzUIStandardSetting Setting)
+{
+	if (UnavailableReason.IsEmpty() && !UKzSettingsLibrary::IsSettingSupported(Setting))
+	{
+		SetUnavailableReason(LOCTEXT("SettingUnsupported", "Not supported on this system"));
+	}
+}
+
 void UKzOptionWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
@@ -162,6 +170,7 @@ void UKzSpinner::Resync_Implementation()
 	{
 		SetValues(UKzSettingsLibrary::GetSettingOptions(Setting, QualitySetting), UKzSettingsLibrary::GetSettingIndex(Setting, QualitySetting));
 		InitialState = UKzSettingsLibrary::CaptureSettingState();
+		MarkUnsupported(Setting);
 	}
 	InitialIndex = SelectedIndex;
 }
@@ -385,6 +394,7 @@ void UKzToggle::Resync_Implementation()
 	{
 		bChecked = UKzSettingsLibrary::GetSettingEnabled(Setting);
 		RefreshValueVisuals();
+		MarkUnsupported(Setting);
 	}
 	bInitialChecked = bChecked;
 }

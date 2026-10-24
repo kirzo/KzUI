@@ -6,7 +6,11 @@
 #include "Scalability.h"
 #include "KzSettingsLibrary.generated.h"
 
-/** Engine settings the option widgets can bind to directly. Resolution, WindowMode and Quality are index-shaped (spinner), VSync is bool-shaped (toggle), ResolutionScale is value-shaped (slider). */
+/**
+ * Engine settings the option widgets can bind to directly. Resolution, WindowMode, Quality, FrameRateLimit and Language are
+ * index-shaped (spinner), VSync and HDR are bool-shaped (toggle, or a two-option spinner), ResolutionScale and Gamma are
+ * value-shaped (slider). Language and Gamma take effect as they change and are saved by ApplySettings, with the rest.
+ */
 UENUM(BlueprintType)
 enum class EKzUIStandardSetting : uint8
 {
@@ -15,7 +19,11 @@ enum class EKzUIStandardSetting : uint8
 	WindowMode,
 	Quality,
 	VSync,
-	ResolutionScale
+	ResolutionScale,
+	FrameRateLimit,
+	HDR,
+	Language,
+	Gamma
 };
 
 /** Scalability group a Quality setting drives. */
@@ -76,6 +84,17 @@ public:
 	/** Applies and saves the pending GameUserSettings changes. */
 	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
 	static void ApplySettings();
+
+	/** Whether this system can use the setting at all: HDR needs a display that supports it. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintPure)
+	static bool IsSettingSupported(EKzUIStandardSetting Setting);
+
+	/** Runs the engine's hardware benchmark and sets the quality levels it recommends, applying them on request. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
+	static void AutoDetectQuality(bool bApply = true);
+
+	/** Restores the Gamma a previous session saved. Called by the module once the engine is up, outside the editor. */
+	static void ApplySavedGamma();
 
 	/** Whether the resolution or window mode in use is not the last one the player confirmed. */
 	UFUNCTION(Category = "KzUI|Settings", BlueprintPure)

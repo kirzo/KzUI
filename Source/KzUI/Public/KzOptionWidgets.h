@@ -79,6 +79,9 @@ protected:
 	/** The change this row scheduled was just applied. */
 	virtual void OnSettingsApplied() {}
 
+	/** Makes the row unavailable when the system cannot use its setting (HDR without an HDR display), unless it already has a reason. */
+	void MarkUnsupported(EKzUIStandardSetting Setting);
+
 private:
 	/** Seconds left before the scheduled apply; negative with none pending. */
 	float ApplyCountdown = -1.0f;
@@ -102,7 +105,7 @@ public:
 	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere)
 	bool bWrap = false;
 
-	/** Index-shaped engine setting to auto-populate from and apply to (Resolution, WindowMode, Quality). */
+	/** Index-shaped engine setting to auto-populate from and apply to (Resolution, WindowMode, Quality, FrameRateLimit, Language, or VSync and HDR as two options). */
 	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere)
 	EKzUIStandardSetting Setting = EKzUIStandardSetting::None;
 
@@ -206,7 +209,7 @@ public:
 	UPROPERTY(Category = "KzUI|Slider", EditAnywhere, meta = (ClampMin = 0.01, ClampMax = 1))
 	float Step = 0.1f;
 
-	/** Value-shaped engine setting to auto-populate from and apply to (ResolutionScale). */
+	/** Value-shaped engine setting to auto-populate from and apply to (ResolutionScale, Gamma). */
 	UPROPERTY(Category = "KzUI|Slider", EditAnywhere)
 	EKzUIStandardSetting Setting = EKzUIStandardSetting::None;
 
@@ -271,7 +274,7 @@ public:
 	UPROPERTY(Category = "KzUI|Toggle", EditAnywhere)
 	FSlateBrush UncheckedBrush;
 
-	/** Bool-shaped engine setting to auto-populate from and apply to (VSync). */
+	/** Bool-shaped engine setting to auto-populate from and apply to (VSync, HDR). */
 	UPROPERTY(Category = "KzUI|Toggle", EditAnywhere)
 	EKzUIStandardSetting Setting = EKzUIStandardSetting::None;
 
