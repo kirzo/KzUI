@@ -2,6 +2,39 @@
 
 #include "KzUIFlipbook.h"
 #include "Engine/Texture2D.h"
+#include "Misc/DataValidation.h"
+
+#define LOCTEXT_NAMESPACE "KzUI"
+
+#if WITH_EDITOR
+EDataValidationResult UKzUIFlipbook::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = Super::IsDataValid(Context);
+	if (FrameSize.X <= 0.0 || FrameSize.Y <= 0.0)
+	{
+		Context.AddError(LOCTEXT("FlipbookFrameSize", "FrameSize must be positive."));
+		return EDataValidationResult::Invalid;
+	}
+
+	// Counted the way GetFrame walks the pages
+	int32 Capacity = 0;
+	for (const UTexture2D* Page : Textures)
+	{
+		if (!Page)
+		{
+			Context.AddError(LOCTEXT("FlipbookEmptyTexture", "A texture slot is empty: the frames past it never show."));
+			return EDataValidationResult::Invalid;
+		}
+		Capacity += FMath::Max(1, FMath::FloorToInt(Page->GetSizeX() / FrameSize.X)) * FMath::Max(1, FMath::FloorToInt(Page->GetSizeY() / FrameSize.Y));
+	}
+	if (TotalFrames > Capacity)
+	{
+		Context.AddError(FText::Format(LOCTEXT("FlipbookTooManyFrames", "TotalFrames is {0}, but the textures only fit {1} frames of {2} x {3}."), TotalFrames, Capacity, FrameSize.X, FrameSize.Y));
+		Result = EDataValidationResult::Invalid;
+	}
+	return Result;
+}
+#endif
 
 bool UKzUIFlipbook::GetFrame(int32 Frame, UTexture2D*& OutTexture, FBox2D& OutUVRegion) const
 {
@@ -36,3 +69,5 @@ bool UKzUIFlipbook::GetFrame(int32 Frame, UTexture2D*& OutTexture, FBox2D& OutUV
 	}
 	return false;
 }
+
+#undef LOCTEXT_NAMESPACE

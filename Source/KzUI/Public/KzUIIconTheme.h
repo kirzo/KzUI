@@ -78,4 +78,9 @@ public:
 
 	UFUNCTION(Category = "KzUI", BlueprintPure)
 	UMaterialInterface* GetVariation(FName Variation) const { return IconVariations.FindRef(Variation); }
+
+#if WITH_EDITOR
+	/** Warns about inputs without a default icon and rejects custom icon names with ':'. */
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
 };

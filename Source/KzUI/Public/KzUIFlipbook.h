@@ -36,4 +36,9 @@ public:
 
 	/** Resolves the texture page and UV region of a frame. */
 	bool GetFrame(int32 Frame, UTexture2D*& OutTexture, FBox2D& OutUVRegion) const;
+
+#if WITH_EDITOR
+	/** FrameSize must be positive, no texture slot empty, and TotalFrames must fit in the textures. */
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
 };

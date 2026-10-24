@@ -34,7 +34,11 @@ public:
 	virtual void PostInitProperties() override;
 	virtual void PostReloadConfig(FProperty* PropertyThatWasLoaded) override;
 #if WITH_EDITOR
+	/** Also reports the IsDataValid issues to the Asset Check log, since nothing validates project settings on save. */
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
+	/** Warns about inputs without keys and keys mapped to two inputs on the same device, per pad family. */
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 
 	UPROPERTY(Category = Input, EditAnywhere, Config, meta = (ReadOnlyKeys, ForceInlineRow))

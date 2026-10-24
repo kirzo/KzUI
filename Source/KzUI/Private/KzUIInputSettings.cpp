@@ -2,6 +2,11 @@
 
 #include "KzUIInputSettings.h"
 
+#include "Logging/MessageLog.h"
+#include "Misc/DataValidation.h"
+
+#define LOCTEXT_NAMESPACE "KzUI"
+
 /** Keys and triggers a project starts with, also used to fill entries missing from an older saved config. */
 static TMap<EKzUIInputType, FKzUIInputData> MakeDefaultInputMap()
 {
@@ -134,5 +139,69 @@ void UKzUIInputSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyC
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 	ResolvedInputs.Reset();
+
+	// Project settings are no asset the validators visit, so the edit itself reports
+	FDataValidationContext Context;
+	if (IsDataValid(Context) != EDataValidationResult::Valid || Context.GetNumWarnings() > 0)
+	{
+		FMessageLog Log("AssetCheck");
+		for (const FDataValidationContext::FIssue& Issue : Context.GetIssues())
+		{
+			if (Issue.TokenizedMessage)
+			{
+				Log.AddMessage(Issue.TokenizedMessage.ToSharedRef());
+			}
+			else
+			{
+				Log.Message(Issue.Severity, Issue.Message);
+			}
+		}
+		Log.Notify(LOCTEXT("InputMapIssues", "The KzUI input map has issues"));
+	}
+}
+
+EDataValidationResult UKzUIInputSettings::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = Super::IsDataValid(Context);
+
+	// Resolved per pad family as a player would get them; keyboard keys come out in every family, so issues are reported once
+	TSet<FString> Reported;
+	const auto Report = [&Context, &Reported](const FText& Message)
+		{
+			if (!Reported.Contains(Message.ToString()))
+			{
+				Reported.Add(Message.ToString());
+				Context.AddWarning(Message);
+			}
+		};
+
+	for (const EKzUIInputDevice Family : { EKzUIInputDevice::Xbox, EKzUIInputDevice::DualShock, EKzUIInputDevice::DualSense, EKzUIInputDevice::Switch })
+	{
+		TMap<FKey, EKzUIInputType> KeyOwners;
+		for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
+		{
+			const FKzUIInputDefinition* Definition = FindInputDefinition(Input, Family);
+			const TArray<FKey> Keys = Definition ? Definition->GetKeys() : TArray<FKey>();
+			if (Keys.IsEmpty())
+			{
+				Report(FText::Format(LOCTEXT("InputWithoutKeys", "{0} has no keys on {1}."), UEnum::GetDisplayValueAsText(Input), UEnum::GetDisplayValueAsText(Family)));
+			}
+
+			for (const FKey& Key : Keys)
+			{
+				const EKzUIInputType* Owner = KeyOwners.Find(Key);
+				if (!Owner)
+				{
+					KeyOwners.Add(Key, Input);
+					continue;
+				}
+				const FText Device = Key.IsGamepadKey() ? UEnum::GetDisplayValueAsText(Family) : UEnum::GetDisplayValueAsText(EKzUIInputDevice::Keyboard);
+				Report(FText::Format(LOCTEXT("KeyInTwoInputs", "{0} is mapped to both {1} and {2} on {3}: only one of them gets it."), Key.GetDisplayName(), UEnum::GetDisplayValueAsText(*Owner), UEnum::GetDisplayValueAsText(Input), Device));
+			}
+		}
+	}
+	return Result;
 }
 #endif
+
+#undef LOCTEXT_NAMESPACE
