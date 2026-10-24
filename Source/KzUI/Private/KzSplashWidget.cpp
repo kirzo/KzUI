@@ -387,9 +387,9 @@ void UKzSplashWidget::MarkSeen(const UWidget* Page)
 	GConfig->Flush(false, GGameUserSettingsIni);
 }
 
-void UKzSplashWidget::OnAppActivationChanged(bool bActive)
+void UKzSplashWidget::OnAppActivationChanged(bool bAppActive)
 {
-	bPaused = !bActive;
+	bPaused = !bAppActive;
 	if (UAudioComponent* Sound = PageSound.Get())
 	{
 		Sound->SetPaused(bPaused);

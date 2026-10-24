@@ -71,7 +71,7 @@ private:
 	bool HasBeenSeen(const UWidget* Page) const;
 	void MarkSeen(const UWidget* Page);
 
-	void OnAppActivationChanged(bool bActive);
+	void OnAppActivationChanged(bool bAppActive);
 
 	bool bReady = false;
 	bool bSkippingAll = false;

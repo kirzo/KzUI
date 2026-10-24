@@ -510,12 +510,12 @@ void UKzTextBlock::AddTextBlock(const FString& Word)
 	];
 }
 
-TSharedRef<STextBlock> UKzTextBlock::MakeTextWidget(const TAttribute<FText>& Text)
+TSharedRef<STextBlock> UKzTextBlock::MakeTextWidget(const TAttribute<FText>& InText)
 {
 	// Appearance is read live, so setters, styles and UMG animations apply without a rebuild
 	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);
 	return SNew(STextBlock)
-		.Text(Text)
+		.Text(InText)
 		.Font_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetFont() : FSlateFontInfo(); })
 		.ColorAndOpacity_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetColorAndOpacity() : FSlateColor(); })
 		.ShadowOffset_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetShadowOffset() : FVector2D::ZeroVector; })
