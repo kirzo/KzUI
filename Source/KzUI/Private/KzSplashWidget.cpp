@@ -12,6 +12,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/InputSettings.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Sound/SoundBase.h"
 #include "Widgets/SViewport.h"
 
@@ -20,6 +21,10 @@ namespace
 	// Timing for switcher children that are not UKzSplashPage
 	constexpr float DefaultPageDuration = 3.0f;
 	constexpr float DefaultFadeTime = 0.5f;
+
+	// Pages with bUnskippableFirstTime already seen on this machine, in the GameUserSettings ini
+	const TCHAR* SeenSection = TEXT("/Script/KzUI.KzSplashWidget");
+	const TCHAR* SeenKey = TEXT("SeenPages");
 }
 
 /**
@@ -157,6 +162,10 @@ void UKzSplashWidget::NativeConstruct()
 		InputListener->Owner = this;
 		FSlateApplication::Get().RegisterInputPreProcessor(InputListener);
 	}
+	if (FSlateApplication::IsInitialized() && !AppActivationHandle.IsValid())
+	{
+		AppActivationHandle = FSlateApplication::Get().OnApplicationActivationStateChanged().AddUObject(this, &UKzSplashWidget::OnAppActivationChanged);
+	}
 
 	StartPage(0);
 }
@@ -175,6 +184,11 @@ void UKzSplashWidget::NativeDestruct()
 	{
 		Sound->Stop();
 	}
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().OnApplicationActivationStateChanged().Remove(AppActivationHandle);
+	}
+	AppActivationHandle.Reset();
 	Super::NativeDestruct();
 }
 
@@ -183,7 +197,7 @@ void UKzSplashWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	UWidget* Page = GetCurrentPage();
-	if (!Page || State == EKzSplashState::Inactive || State == EKzSplashState::Finished)
+	if (!Page || bPaused || State == EKzSplashState::Inactive || State == EKzSplashState::Finished)
 	{
 		return;
 	}
@@ -207,8 +221,10 @@ void UKzSplashWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		}
 		case EKzSplashState::Hold:
 		{
-			if (StateTime >= (Config ? Config->Duration : DefaultPageDuration))
+			const bool bHeldBack = Config && Config->bWaitForReady && !bReady;
+			if (StateTime >= (Config ? Config->Duration : DefaultPageDuration) && !bHeldBack)
 			{
+				MarkSeen(Page);
 				BeginFadeOut();
 			}
 			break;
@@ -230,17 +246,12 @@ void UKzSplashWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
 bool UKzSplashWidget::Skip()
 {
-	if (State != EKzSplashState::FadeIn && State != EKzSplashState::Hold)
+	if ((State != EKzSplashState::FadeIn && State != EKzSplashState::Hold) || !IsSkippable(GetCurrentPage()))
 	{
 		return false;
 	}
 
 	const UKzSplashPage* Config = GetCurrentSplashPage();
-	if (Config && !Config->bSkippable)
-	{
-		return false;
-	}
-
 	BeginFadeOut();
 
 	// A page that plays out keeps its sound to the end; a skipped one takes it along in its fade
@@ -251,8 +262,25 @@ bool UKzSplashWidget::Skip()
 	return true;
 }
 
+void UKzSplashWidget::SkipAll()
+{
+	bSkippingAll = true;
+	Skip();
+}
+
+void UKzSplashWidget::SetReady()
+{
+	bReady = true;
+}
+
 void UKzSplashWidget::StartPage(int32 Index)
 {
+	// Skipping everything, the pages that allow it are not even shown
+	while (bSkippingAll && Pages && Index < Pages->GetChildrenCount() && IsSkippable(Pages->GetChildAt(Index)))
+	{
+		++Index;
+	}
+
 	if (!Pages || Index >= Pages->GetChildrenCount())
 	{
 		Finish();
@@ -320,4 +348,50 @@ UWidget* UKzSplashWidget::GetCurrentPage() const
 UKzSplashPage* UKzSplashWidget::GetCurrentSplashPage() const
 {
 	return Cast<UKzSplashPage>(GetCurrentPage());
+}
+
+bool UKzSplashWidget::IsSkippable(const UWidget* Page) const
+{
+	const UKzSplashPage* Config = Cast<UKzSplashPage>(Page);
+	if (!Config)
+	{
+		return true;
+	}
+	return Config->bSkippable && !(Config->bWaitForReady && !bReady) && !(Config->bUnskippableFirstTime && !HasBeenSeen(Page));
+}
+
+FString UKzSplashWidget::GetSeenKey(const UWidget* Page) const
+{
+	return FString::Printf(TEXT("%s.%s"), *GetClass()->GetName(), *Page->GetName());
+}
+
+bool UKzSplashWidget::HasBeenSeen(const UWidget* Page) const
+{
+	TArray<FString> Seen;
+	GConfig->GetArray(SeenSection, SeenKey, Seen, GGameUserSettingsIni);
+	return Seen.Contains(GetSeenKey(Page));
+}
+
+void UKzSplashWidget::MarkSeen(const UWidget* Page)
+{
+	const UKzSplashPage* Config = Cast<UKzSplashPage>(Page);
+	if (!Config || !Config->bUnskippableFirstTime || HasBeenSeen(Page))
+	{
+		return;
+	}
+
+	TArray<FString> Seen;
+	GConfig->GetArray(SeenSection, SeenKey, Seen, GGameUserSettingsIni);
+	Seen.Add(GetSeenKey(Page));
+	GConfig->SetArray(SeenSection, SeenKey, Seen, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+void UKzSplashWidget::OnAppActivationChanged(bool bActive)
+{
+	bPaused = !bActive;
+	if (UAudioComponent* Sound = PageSound.Get())
+	{
+		Sound->SetPaused(bPaused);
+	}
 }

@@ -40,6 +40,14 @@ public:
 	UFUNCTION(Category = "KzUI|Splash", BlueprintCallable)
 	bool Skip();
 
+	/** Skips the current page and every following one that can be skipped; the ones that cannot still play. */
+	UFUNCTION(Category = "KzUI|Splash", BlueprintCallable)
+	void SkipAll();
+
+	/** Lets the pages with bWaitForReady move on, once their Duration has passed. */
+	UFUNCTION(Category = "KzUI|Splash", BlueprintCallable)
+	void SetReady();
+
 	UFUNCTION(Category = "KzUI|Splash", BlueprintImplementableEvent, meta = (DisplayName = "On Page Changed"))
 	void ReceiveOnPageChanged(int32 Index, UWidget* Page);
 
@@ -54,6 +62,24 @@ private:
 	void Finish();
 	UWidget* GetCurrentPage() const;
 	UKzSplashPage* GetCurrentSplashPage() const;
+
+	/** Whether the page can be skipped right now: its own setting, its first viewing and its wait for SetReady. */
+	bool IsSkippable(const UWidget* Page) const;
+
+	/** Key of the page in the list of pages seen on this machine. */
+	FString GetSeenKey(const UWidget* Page) const;
+	bool HasBeenSeen(const UWidget* Page) const;
+	void MarkSeen(const UWidget* Page);
+
+	void OnAppActivationChanged(bool bActive);
+
+	bool bReady = false;
+	bool bSkippingAll = false;
+
+	/** The app is in the background: time stands still and the page sound waits. */
+	bool bPaused = false;
+
+	FDelegateHandle AppActivationHandle;
 
 	EKzSplashState State = EKzSplashState::Inactive;
 	float StateTime = 0.0f;

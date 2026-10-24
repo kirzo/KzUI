@@ -30,6 +30,14 @@ public:
 	UPROPERTY(Category = "KzUI|Splash", EditAnywhere)
 	bool bSkippable = true;
 
+	/** Not skippable the first time it is shown on this machine, skippable afterwards: legal and rating screens. Remembered in the GameUserSettings ini. */
+	UPROPERTY(Category = "KzUI|Splash", EditAnywhere, meta = (EditCondition = "bSkippable"))
+	bool bUnskippableFirstTime = false;
+
+	/** After Duration, holds until the splash's SetReady, e.g. once the game has loaded behind it: Duration becomes the minimum time on screen, and it cannot be skipped before it is ready. */
+	UPROPERTY(Category = "KzUI|Splash", EditAnywhere)
+	bool bWaitForReady = false;
+
 	/** Played when the page is shown. */
 	UPROPERTY(Category = "KzUI|Splash", EditAnywhere)
 	TObjectPtr<USoundBase> Sound;
