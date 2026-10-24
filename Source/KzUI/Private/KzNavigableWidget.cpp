@@ -548,6 +548,20 @@ void UKzNavigableWidget::ClearSelection()
 
 void UKzNavigableWidget::OverrideOptions(TArray<UWidget*> NewOptions)
 {
+	SetOptions(MoveTemp(NewOptions), false);
+}
+
+void UKzNavigableWidget::RefreshOptions()
+{
+	if (!IsDesignTime())
+	{
+		SetOptions(GetOptions(), true);
+	}
+}
+
+void UKzNavigableWidget::SetOptions(TArray<UWidget*> NewOptions, bool bKeepHover)
+{
+	UWidget* PreviousHover = HoveredOption;
 	Options.Reset();
 	for (UWidget* Option : NewOptions)
 	{
@@ -575,21 +589,34 @@ void UKzNavigableWidget::OverrideOptions(TArray<UWidget*> NewOptions)
 		}
 	}
 
-	HoveredOption = GetDefaultOption();
-	if (!Options.Contains(HoveredOption))
+	if (!bKeepHover || !Options.Contains(PreviousHover) || !IsWidgetSelectable(PreviousHover))
 	{
-		HoveredOption = nullptr;
-		for (UWidget* Option : Options)
+		HoveredOption = GetDefaultOption();
+		if (!Options.Contains(HoveredOption))
 		{
-			if (IsWidgetSelectable(Option))
+			HoveredOption = nullptr;
+			for (UWidget* Option : Options)
 			{
-				HoveredOption = Option;
-				break;
+				if (IsWidgetSelectable(Option))
+				{
+					HoveredOption = Option;
+					break;
+				}
 			}
 		}
 	}
+
+	// Widgets that stopped being options lose their hover and selection looks, which RefreshHover no longer reaches
+	if (IsValid(PreviousHover) && !Options.Contains(PreviousHover))
+	{
+		IKzSelectableWidgetInterface::Hover(PreviousHover, false);
+	}
 	if (!Options.Contains(SelectedOption))
 	{
+		if (IsValid(SelectedOption))
+		{
+			IKzSelectableWidgetInterface::Select(SelectedOption, false);
+		}
 		SelectedOption = nullptr;
 	}
 	RefreshHover();

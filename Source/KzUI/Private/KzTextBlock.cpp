@@ -2,6 +2,7 @@
 
 #include "KzTextBlock.h"
 #include "KzInputIcon.h"
+#include "KzNavigableWidget.h"
 #include "KzTextStyle.h"
 #include "KzUIIconTheme.h"
 #include "KzUIInputSettings.h"
@@ -57,6 +58,20 @@ void UKzTextBlock::SetIsEnabled(bool bInIsEnabled)
 	if (bChanged)
 	{
 		ApplyStyle();
+	}
+}
+
+void UKzTextBlock::SetIsSelectable_Implementation(bool bNewSelectable)
+{
+	if (bSelectable != bNewSelectable)
+	{
+		bSelectable = bNewSelectable;
+
+		// Options are collected once: the owner collects them again so the text enters or leaves the navigation
+		if (UKzNavigableWidget* Owner = GetTypedOuter<UKzNavigableWidget>())
+		{
+			Owner->RefreshOptions();
+		}
 	}
 }
 

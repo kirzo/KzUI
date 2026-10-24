@@ -1,6 +1,7 @@
 // Copyright 2026 kirzo
 
 #include "KzOptionWidgets.h"
+#include "KzNavigableWidget.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
@@ -25,6 +26,20 @@ TArray<UWidget*> UKzOptionWidget::GetLinkedSelectables_Implementation() const
 		);
 	}
 	return Result;
+}
+
+void UKzOptionWidget::SetIsSelectable_Implementation(bool bNewSelectable)
+{
+	if (bSelectable != bNewSelectable)
+	{
+		bSelectable = bNewSelectable;
+
+		// Options are collected once: the owner collects them again so the row enters or leaves the navigation
+		if (UKzNavigableWidget* Owner = GetTypedOuter<UKzNavigableWidget>())
+		{
+			Owner->RefreshOptions();
+		}
+	}
 }
 
 void UKzOptionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)

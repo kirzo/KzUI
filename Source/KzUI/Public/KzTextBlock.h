@@ -108,7 +108,7 @@ public:
 
 	//~ Begin IKzSelectableWidgetInterface
 	virtual bool IsSelectable_Implementation() const override { return bSelectable; }
-	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override { bSelectable = bNewSelectable; }
+	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override;
 	virtual void OnSelect_Implementation() override;
 	virtual void OnDeselect_Implementation() override;
 	virtual void OnHovered_Implementation() override;

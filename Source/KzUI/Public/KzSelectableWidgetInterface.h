@@ -20,6 +20,7 @@ class KZUI_API IKzSelectableWidgetInterface
 	GENERATED_BODY()
 
 public:
+	/** Whether the widget is one of its navigable widget's options. */
 	UFUNCTION(Category = Selection, BlueprintCallable, BlueprintNativeEvent)
 	bool IsSelectable() const;
 	virtual bool IsSelectable_Implementation() const { return true; }
@@ -29,6 +30,7 @@ public:
 	bool CanBeSelected() const;
 	virtual bool CanBeSelected_Implementation() const { return true; }
 
+	/** The navigable widget collects its options once, so a change must refresh them: KzOptionWidget and KzTextBlock call its Refresh Options, a Blueprint implementation should do the same. */
 	UFUNCTION(Category = Selection, BlueprintCallable, BlueprintNativeEvent)
 	void SetIsSelectable(bool bNewSelectable);
 

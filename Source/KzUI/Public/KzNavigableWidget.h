@@ -123,6 +123,10 @@ public:
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintCallable)
 	void OverrideOptions(TArray<UWidget*> NewOptions);
 
+	/** Collects GetOptions again, keeping the hover where it is while that is still an option. Runs when SetIsSelectable changes a KzOptionWidget or KzTextBlock; call it after changing the options any other way. */
+	UFUNCTION(Category = "KzUI|Navigation", BlueprintCallable)
+	void RefreshOptions();
+
 	/** Collects the selectable widgets under Root (inclusive), in tree order. Handy to scope a GetOptions override to a single container. */
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintPure)
 	TArray<UWidget*> GetOptionsUnder(UWidget* Root) const;
@@ -141,6 +145,9 @@ protected:
 	void PlaySelectSound();
 
 private:
+	/** OverrideOptions, optionally keeping the current hover when it is still an option. */
+	void SetOptions(TArray<UWidget*> NewOptions, bool bKeepHover);
+
 	void HandleNavigationInput(EKzUIInputType Input, bool Handled);
 
 	bool CanHandleNavigationInput(EKzUIInputType Input);

@@ -50,7 +50,7 @@ public:
 
 	//~ Begin IKzSelectableWidgetInterface
 	virtual bool IsSelectable_Implementation() const override { return bSelectable; }
-	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override { bSelectable = bNewSelectable; }
+	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override;
 	virtual bool CanBeSelected_Implementation() const override { return false; }
 	virtual TArray<UWidget*> GetLinkedSelectables_Implementation() const override;
 	//~ End IKzSelectableWidgetInterface
