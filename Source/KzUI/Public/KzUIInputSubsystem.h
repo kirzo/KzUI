@@ -17,6 +17,7 @@ class UKzUISoundTheme;
 class UKzUIIconTheme;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FKzUIInputDeviceChangedSignature, EKzUIInputDevice, InputDevice);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FKzUIGamepadConnectionChangedSignature, bool, bConnected);
 
 /**
  * Tracks the widgets a local player has on screen and the input device they are using.
@@ -56,9 +57,19 @@ private:
 	/** Keeps the project prompt class loaded, so ShowPrompt does not load it synchronously mid game. */
 	TSharedPtr<FStreamableHandle> PromptClassHandle;
 
+	bool bGamepadConnected = false;
+
 public:
 	UPROPERTY(Category = KzUI, BlueprintAssignable)
 	FKzUIInputDeviceChangedSignature OnInputDeviceChanged;
+
+	/** The player went from having a connected pad to having none, or back: the usual "reconnect your controller" notice. */
+	UPROPERTY(Category = KzUI, BlueprintAssignable)
+	FKzUIGamepadConnectionChangedSignature OnGamepadConnectionChanged;
+
+	/** Whether a pad assigned to this player by the platform is connected. */
+	UFUNCTION(Category = KzUI, BlueprintPure)
+	bool IsGamepadConnected() const { return bGamepadConnected; }
 
 	static UKzUIInputSubsystem* Get(const ULocalPlayer* LocalPlayer);
 
@@ -71,7 +82,7 @@ public:
 	/** Pad family native to the running platform: the fallback for unmapped pads and the gamepad device before any pad is used. */
 	static EKzUIInputDevice GetPlatformGamepadDevice();
 
-	/** Records the family of pads whose backend announces the connection inside their device scope, so a player starts on their own pad's prompts. Bound by the module. */
+	/** Records the family of pads whose backend announces the connection inside their device scope, so a player starts on their own pad's prompts, and tells every player whether they still have a pad. Bound by the module. */
 	static void HandleInputDeviceConnectionChange(EInputDeviceConnectionState NewConnectionState, FPlatformUserId PlatformUserId, FInputDeviceId InputDeviceId);
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -128,6 +139,9 @@ public:
 	UKzUIIconTheme* GetIconTheme() const;
 
 private:
+	/** Reads whether the player has a connected pad, broadcasting the change. */
+	void RefreshGamepadConnection(bool bBroadcast);
+
 	void OnAppActivationChanged(bool bActivated);
 
 	/** Runs the tick after the app comes back, once the window activation has moved focus and capture around. */

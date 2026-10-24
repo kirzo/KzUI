@@ -122,14 +122,58 @@ void UKzUIInputSubsystem::HandleInputDeviceConnectionChange(EInputDeviceConnecti
 	if (NewConnectionState != EInputDeviceConnectionState::Connected)
 	{
 		ConnectedPads.Remove(InputDeviceId);
-		return;
 	}
-
-	const FInputDeviceScope* Scope = FInputDeviceScope::GetCurrent();
-	if (Scope && !Scope->HardwareDeviceIdentifier.IsEmpty())
+	else if (const FInputDeviceScope* Scope = FInputDeviceScope::GetCurrent(); Scope && !Scope->HardwareDeviceIdentifier.IsEmpty())
 	{
 		const EKzUIInputDevice* Mapped = UKzUIInputSettings::Get()->DeviceMappings.Find(FName(*Scope->HardwareDeviceIdentifier));
 		ConnectedPads.Add(InputDeviceId, Mapped ? *Mapped : GetPlatformGamepadDevice());
+	}
+
+	// Every player, not only PlatformUserId: a platform may hand a disconnected pad to the unpaired user
+	if (!GEngine)
+	{
+		return;
+	}
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		if (const UGameInstance* GameInstance = Context.OwningGameInstance)
+		{
+			for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
+			{
+				if (UKzUIInputSubsystem* Subsystem = Get(Player))
+				{
+					Subsystem->RefreshGamepadConnection(true);
+				}
+			}
+		}
+	}
+}
+
+void UKzUIInputSubsystem::RefreshGamepadConnection(bool bBroadcast)
+{
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
+	// The default device is the keyboard and mouse
+	const IPlatformInputDeviceMapper& Mapper = IPlatformInputDeviceMapper::Get();
+	TArray<FInputDeviceId> Devices;
+	Mapper.GetAllInputDevicesForUser(LocalPlayer->GetPlatformUserId(), Devices);
+	const bool bConnected = Devices.ContainsByPredicate([&Mapper](const FInputDeviceId Device)
+		{
+			return Device != Mapper.GetDefaultInputDevice() && Mapper.GetInputDeviceConnectionState(Device) == EInputDeviceConnectionState::Connected;
+		}
+	);
+
+	if (bConnected != bGamepadConnected)
+	{
+		bGamepadConnected = bConnected;
+		if (bBroadcast)
+		{
+			OnGamepadConnectionChanged.Broadcast(bGamepadConnected);
+		}
 	}
 }
 
@@ -152,6 +196,7 @@ void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			{
 				SetCurrentInputDevice(*PadDevice);
 			}
+			RefreshGamepadConnection(false);
 
 			const TSharedPtr<const FSlateUser> SlateUser = LocalPlayer ? LocalPlayer->GetSlateUser() : nullptr;
 			EKzUIInputDevice Device = EKzUIInputDevice::Keyboard;
