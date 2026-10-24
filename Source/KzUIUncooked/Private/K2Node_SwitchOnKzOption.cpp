@@ -57,6 +57,12 @@ FText UK2Node_SwitchOnKzOption::GetTooltipText() const
 	return INVTEXT("Routes the execution to the pin matching the given option widget. Pins are generated from the selectable widgets of this Blueprint and refresh before every compile.");
 }
 
+FLinearColor UK2Node_SwitchOnKzOption::GetNodeTitleColor() const
+{
+	// The same yellow as the engine's Switch nodes (UK2Node_Switch)
+	return FLinearColor(255.0f, 255.0f, 0.0f);
+}
+
 FSlateIcon UK2Node_SwitchOnKzOption::GetIconAndTint(FLinearColor& OutColor) const
 {
 	OutColor = FLinearColor::White;
