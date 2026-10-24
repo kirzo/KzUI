@@ -62,6 +62,12 @@ void UKzTextBlock::SetIsEnabled(bool bInIsEnabled)
 	}
 }
 
+void UKzTextBlock::SetUnavailableReason(const FText& Reason)
+{
+	UnavailableReason = Reason;
+	ApplyStyle();
+}
+
 void UKzTextBlock::SetIsSelectable_Implementation(bool bNewSelectable)
 {
 	if (bSelectable != bNewSelectable)
@@ -128,7 +134,7 @@ void UKzTextBlock::OnWrapTextAtChanged(float InWrapTextAt)
 void UKzTextBlock::ApplyStyle()
 {
 	// Hover is the live cursor, so it wins over the persistent selection while on top of it
-	const EKzUIWidgetState State = !GetIsEnabled() ? EKzUIWidgetState::Disabled : (bHovered ? EKzUIWidgetState::Hovered : (bSelected ? EKzUIWidgetState::Selected : EKzUIWidgetState::Normal));
+	const EKzUIWidgetState State = !GetIsEnabled() || !UnavailableReason.IsEmpty() ? EKzUIWidgetState::Disabled : (bHovered ? EKzUIWidgetState::Hovered : (bSelected ? EKzUIWidgetState::Selected : EKzUIWidgetState::Normal));
 
 	const UKzTextStyle* Look = ResolveLook(State);
 	if (!Look && State != EKzUIWidgetState::Normal)

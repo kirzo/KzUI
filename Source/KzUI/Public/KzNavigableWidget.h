@@ -89,6 +89,10 @@ public:
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintPure)
 	UWidget* GetHoveredOption() const { return HoveredOption; }
 
+	/** Why the hovered option cannot be used, empty when it can or nothing is hovered. Handy for a footer refreshed on On Hover Changed. */
+	UFUNCTION(Category = "KzUI|Navigation", BlueprintPure)
+	FText GetHoveredUnavailableReason() const;
+
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintPure)
 	UWidget* GetSelectedOption() const { return SelectedOption; }
 
@@ -110,6 +114,10 @@ public:
 	/** A supported direction had nowhere to move. Only fires when the navigation does not loop. */
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintImplementableEvent, meta = (DisplayName = "On Navigation Edge"))
 	void ReceiveOnNavigationEdge(EKzUIInputType Input);
+
+	/** The hover moved to another option, by navigation, mouse or a change of the options. Option may be null. */
+	UFUNCTION(Category = "KzUI|Navigation", BlueprintImplementableEvent, meta = (DisplayName = "On Hover Changed"))
+	void ReceiveOnHoverChanged(UWidget* Option);
 
 	/** Defaults to every widget of the tree implementing the selectable interface with IsSelectable on, in tree order. */
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintNativeEvent, BlueprintCosmetic, BlueprintCallable)

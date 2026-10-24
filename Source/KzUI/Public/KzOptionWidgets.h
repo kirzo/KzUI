@@ -29,6 +29,14 @@ public:
 	UPROPERTY(Category = "KzUI|Option", EditAnywhere)
 	bool bSelectable = true;
 
+	/** Non-empty makes the row unavailable ("Requires a restart"): still hovered and navigated through, but its inputs do nothing. Its inner KzTextBlocks take the Disabled style. */
+	UPROPERTY(Category = "KzUI|Option", EditAnywhere, BlueprintReadOnly)
+	FText UnavailableReason;
+
+	/** Empty makes the row available again. */
+	UFUNCTION(Category = "KzUI|Option", BlueprintCallable)
+	void SetUnavailableReason(const FText& Reason);
+
 	/** With a bound Setting: apply and save each change once the value rests for a moment, so holding a direction applies once. Applying also applies whatever other rows have staged. Off, changes are only staged until UKzSettingsLibrary::ApplySettings (confirm-on-exit flows); discard them by reverting the rows. */
 	UPROPERTY(Category = "KzUI|Option", EditAnywhere)
 	bool bApplyImmediately = true;
@@ -51,11 +59,13 @@ public:
 	//~ Begin IKzSelectableWidgetInterface
 	virtual bool IsSelectable_Implementation() const override { return bSelectable; }
 	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override;
+	virtual FText GetUnavailableReason_Implementation() const override { return UnavailableReason; }
 	virtual bool CanBeSelected_Implementation() const override { return false; }
 	virtual TArray<UWidget*> GetLinkedSelectables_Implementation() const override;
 	//~ End IKzSelectableWidgetInterface
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeDestruct() override;
 

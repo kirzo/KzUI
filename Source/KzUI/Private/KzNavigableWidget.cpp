@@ -46,6 +46,11 @@ static void ScrollIntoView(UWidget* Option)
 	}
 }
 
+static FText GetUnavailableReason(UWidget* Widget)
+{
+	return IsValid(Widget) && Widget->Implements<UKzSelectableWidgetInterface>() ? IKzSelectableWidgetInterface::Execute_GetUnavailableReason(Widget) : FText::GetEmpty();
+}
+
 static bool CanSelectOption(UWidget* Widget)
 {
 	return IsValid(Widget) && (!Widget->Implements<UKzSelectableWidgetInterface>() || IKzSelectableWidgetInterface::Execute_CanBeSelected(Widget));
@@ -193,6 +198,13 @@ void UKzNavigableWidget::AcceptInputTriggered_Implementation(bool Handled)
 {
 	if (Handled && HoveredOption)
 	{
+		// An unavailable option takes the press and does nothing, with the plain Accept sound as feedback
+		if (!GetUnavailableReason(HoveredOption).IsEmpty())
+		{
+			UKzUserWidget::PlayInputSound(EKzUIInputType::Accept);
+			return;
+		}
+
 		// The hovered option can claim Accept for itself (e.g. a toggle)
 		if (HoveredOptionWantsInput(EKzUIInputType::Accept))
 		{
@@ -224,10 +236,10 @@ void UKzNavigableWidget::HandleNavigationInput(EKzUIInputType Input, bool Handle
 {
 	if (Handled)
 	{
-		// The hovered option can claim the input for itself (e.g. Left/Right on a spinner)
+		// The hovered option can claim the input for itself (e.g. Left/Right on a spinner); an unavailable one keeps it and does nothing
 		if (HoveredOptionWantsInput(Input))
 		{
-			if (IKzSelectableWidgetInterface::Execute_HandleInput(HoveredOption, Input))
+			if (GetUnavailableReason(HoveredOption).IsEmpty() && IKzSelectableWidgetInterface::Execute_HandleInput(HoveredOption, Input))
 			{
 				PlayHoverSound();
 			}
@@ -533,6 +545,12 @@ void UKzNavigableWidget::HoverWidget(UWidget* Widget)
 	PlayHoverSound();
 
 	IKzSelectableWidgetInterface::Hover(HoveredOption, true);
+	ReceiveOnHoverChanged(HoveredOption);
+}
+
+FText UKzNavigableWidget::GetHoveredUnavailableReason() const
+{
+	return GetUnavailableReason(HoveredOption);
 }
 
 void UKzNavigableWidget::SelectOption(UWidget* Widget)
@@ -635,6 +653,11 @@ void UKzNavigableWidget::SetOptions(TArray<UWidget*> NewOptions, bool bKeepHover
 		SelectedOption = nullptr;
 	}
 	RefreshHover();
+
+	if (HoveredOption != PreviousHover)
+	{
+		ReceiveOnHoverChanged(HoveredOption);
+	}
 }
 
 UButton* UKzNavigableWidget::GetButton(UWidget* Widget)

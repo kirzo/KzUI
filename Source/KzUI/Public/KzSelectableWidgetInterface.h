@@ -25,6 +25,11 @@ public:
 	bool IsSelectable() const;
 	virtual bool IsSelectable_Implementation() const { return true; }
 
+	/** Why the widget cannot be used right now ("Requires a restart"), empty when it can. An unavailable option is still navigated through and hovered, but Accept and its claimed inputs do nothing. */
+	UFUNCTION(Category = Selection, BlueprintCallable, BlueprintNativeEvent)
+	FText GetUnavailableReason() const;
+	virtual FText GetUnavailableReason_Implementation() const { return FText::GetEmpty(); }
+
 	/** Whether Accept commits this widget as the selection. Hover-only widgets (e.g. setting rows that act instead of being selected) return false. */
 	UFUNCTION(Category = Selection, BlueprintCallable, BlueprintNativeEvent)
 	bool CanBeSelected() const;

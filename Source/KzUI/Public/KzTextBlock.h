@@ -43,6 +43,10 @@ public:
 	UPROPERTY(Category = Selection, EditAnywhere, BlueprintReadOnly)
 	bool bSelectable = false;
 
+	/** Non-empty makes the option unavailable: still hovered and navigated through, but Accept does nothing, and it takes the Disabled style. */
+	UPROPERTY(Category = Selection, EditAnywhere, BlueprintReadOnly)
+	FText UnavailableReason;
+
 	/** Tint the icons with ColorAndOpacity as well. */
 	UPROPERTY(Category = Icon, EditAnywhere)
 	bool bApplyColorToIcons = false;
@@ -99,6 +103,10 @@ public:
 	UFUNCTION(Category = "KzUI", BlueprintCallable)
 	void SetStyle(TSubclassOf<UKzTextBlockStyle> NewStyle);
 
+	/** Empty makes the option available again. */
+	UFUNCTION(Category = "KzUI", BlueprintCallable)
+	void SetUnavailableReason(const FText& Reason);
+
 	//~ Begin UTextBlock Interface
 	virtual void SetText(FText InText) override;
 	//~ End UTextBlock Interface
@@ -110,6 +118,7 @@ public:
 	//~ Begin IKzSelectableWidgetInterface
 	virtual bool IsSelectable_Implementation() const override { return bSelectable; }
 	virtual void SetIsSelectable_Implementation(bool bNewSelectable) override;
+	virtual FText GetUnavailableReason_Implementation() const override { return UnavailableReason; }
 	virtual void OnSelect_Implementation() override;
 	virtual void OnDeselect_Implementation() override;
 	virtual void OnHovered_Implementation() override;

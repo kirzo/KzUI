@@ -2,6 +2,7 @@
 
 #include "KzOptionWidgets.h"
 #include "KzNavigableWidget.h"
+#include "KzTextBlock.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
@@ -26,6 +27,29 @@ TArray<UWidget*> UKzOptionWidget::GetLinkedSelectables_Implementation() const
 		);
 	}
 	return Result;
+}
+
+void UKzOptionWidget::SetUnavailableReason(const FText& Reason)
+{
+	UnavailableReason = Reason;
+	for (UWidget* Linked : IKzSelectableWidgetInterface::Execute_GetLinkedSelectables(this))
+	{
+		if (UKzTextBlock* Text = Cast<UKzTextBlock>(Linked))
+		{
+			Text->SetUnavailableReason(Reason);
+		}
+	}
+}
+
+void UKzOptionWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	// The texts of a row set unavailable in the designer look disabled too
+	if (!UnavailableReason.IsEmpty())
+	{
+		SetUnavailableReason(UnavailableReason);
+	}
 }
 
 void UKzOptionWidget::SetIsSelectable_Implementation(bool bNewSelectable)
