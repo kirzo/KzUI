@@ -11,7 +11,7 @@ public class KzUIUncooked : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"KzUI"
+				"BlueprintGraph"
 			}
 			);
 
@@ -21,12 +21,11 @@ public class KzUIUncooked : ModuleRules
 				"Core",
 				"CoreUObject",
 				"Engine",
-				"Slate",
 				"SlateCore",
 				"UMG",
 				"UnrealEd",
-				"BlueprintGraph",
-				"KismetCompiler"
+				"KismetCompiler",
+				"KzUI"
 			}
 			);
 	}
