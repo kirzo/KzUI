@@ -10,7 +10,7 @@
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 
-/** Switch on Option pins follow the widget tree, which the compiler never asks about: refreshed here, a renamed option with links fails to compile instead of falling through to Default. */
+/** Switch on Option pins follow the widget tree, which the compiler never asks about: refreshed here, a renamed option keeps its links and a deleted one with links fails to compile instead of falling through to Default. */
 static void RefreshSwitchOnOptionNodes(UBlueprint* Blueprint)
 {
 	TArray<UK2Node_SwitchOnKzOption*> Nodes;

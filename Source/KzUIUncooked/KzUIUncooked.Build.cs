@@ -23,6 +23,7 @@ public class KzUIUncooked : ModuleRules
 				"Engine",
 				"SlateCore",
 				"UMG",
+				"UMGEditor",
 				"UnrealEd",
 				"KismetCompiler",
 				"KzUI"

@@ -6,7 +6,6 @@
 #include "KzSelectableWidgetInterface.h"
 #include "KzUIFunctionLibrary.h"
 
-#include "BaseWidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "BlueprintActionDatabaseRegistrar.h"
 #include "BlueprintNodeSpawner.h"
@@ -14,6 +13,7 @@
 #include "K2Node_IfThenElse.h"
 #include "KismetCompiler.h"
 #include "Styling/AppStyle.h"
+#include "WidgetBlueprint.h"
 
 namespace
 {
@@ -99,7 +99,7 @@ void UK2Node_SwitchOnKzOption::ValidateNodeDuringCompilation(FCompilerResultsLog
 
 	TArray<FName> Names;
 	bool bSkippedDefault = false;
-	if (CollectOptionNames(Names, &bSkippedDefault) && bSkippedDefault)
+	if (CollectOptionNames(Names, nullptr, &bSkippedDefault) && bSkippedDefault)
 	{
 		MessageLog.Warning(TEXT("@@ cannot give a pin to the option named Default, which would take the Default pin's place: rename the widget."), this);
 	}
@@ -191,26 +191,66 @@ TArray<FName> UK2Node_SwitchOnKzOption::GetOptionNames() const
 bool UK2Node_SwitchOnKzOption::RefreshOptions()
 {
 	TArray<FName> Names;
-	if (!CollectOptionNames(Names) || Names == CachedOptionNames)
+	TArray<FGuid> Guids;
+	if (!CollectOptionNames(Names, &Guids))
 	{
+		return false;
+	}
+	if (Names == CachedOptionNames)
+	{
+		// Same names, maybe other widgets behind them: the next rename must match against these
+		CachedOptionGuids = MoveTemp(Guids);
 		return false;
 	}
 	ReconstructNode();
 	return true;
 }
 
+void UK2Node_SwitchOnKzOption::ReallocatePinsDuringReconstruction(TArray<UEdGraphPin*>& OldPins)
+{
+	const TArray<FName> OldNames = CachedOptionNames;
+	const TArray<FGuid> OldGuids = CachedOptionGuids;
+	Super::ReallocatePinsDuringReconstruction(OldPins);
+
+	// A renamed widget keeps its GUID: its old pin takes the new name, so the rewiring carries the links over
+	for (UEdGraphPin* OldPin : OldPins)
+	{
+		const int32 OldIndex = OldPin->Direction == EGPD_Output ? OldNames.Find(OldPin->PinName) : INDEX_NONE;
+		const FGuid Guid = OldGuids.IsValidIndex(OldIndex) ? OldGuids[OldIndex] : FGuid();
+		const int32 NewIndex = Guid.IsValid() ? CachedOptionGuids.Find(Guid) : INDEX_NONE;
+		if (CachedOptionNames.IsValidIndex(NewIndex))
+		{
+			OldPin->PinName = CachedOptionNames[NewIndex];
+		}
+	}
+}
+
 void UK2Node_SwitchOnKzOption::RefreshCachedOptionNames()
 {
 	// Without the trees (the Blueprint is loading) the serialized names stand
 	TArray<FName> Names;
-	if (CollectOptionNames(Names))
+	TArray<FGuid> Guids;
+	if (CollectOptionNames(Names, &Guids))
 	{
+		// A disabled option that was renamed stays disabled under its new name
+		for (FName& Disabled : DisabledOptions)
+		{
+			const int32 OldIndex = CachedOptionNames.Find(Disabled);
+			const FGuid Guid = CachedOptionGuids.IsValidIndex(OldIndex) ? CachedOptionGuids[OldIndex] : FGuid();
+			const int32 NewIndex = Guid.IsValid() ? Guids.Find(Guid) : INDEX_NONE;
+			if (Names.IsValidIndex(NewIndex))
+			{
+				Disabled = Names[NewIndex];
+			}
+		}
+
 		CachedOptionNames = MoveTemp(Names);
+		CachedOptionGuids = MoveTemp(Guids);
 		DisabledOptions.RemoveAll([this](const FName Name) { return !CachedOptionNames.Contains(Name); });
 	}
 }
 
-bool UK2Node_SwitchOnKzOption::CollectOptionNames(TArray<FName>& OutNames, bool* bOutSkippedDefault) const
+bool UK2Node_SwitchOnKzOption::CollectOptionNames(TArray<FName>& OutNames, TArray<FGuid>* OutGuids, bool* bOutSkippedDefault) const
 {
 	// The source trees and not the generated class, whose tree only changes at the end of a compile: designer
 	// edits show right away. Nothing is read while loading, when Blueprint events must not run on templates.
@@ -221,40 +261,58 @@ bool UK2Node_SwitchOnKzOption::CollectOptionNames(TArray<FName>& OutNames, bool*
 	}
 
 	// A child Widget Blueprint draws the tree of the nearest parent that has one and only fills its named slots
-	const UWidgetTree* RootTree = nullptr;
-	for (const UBaseWidgetBlueprint* Current = Blueprint; Current && !RootTree; Current = Cast<UBaseWidgetBlueprint>(UBlueprint::GetBlueprintFromClass(Current->ParentClass)))
+	const UBaseWidgetBlueprint* RootOwner = nullptr;
+	for (const UBaseWidgetBlueprint* Current = Blueprint; Current && !RootOwner; Current = Cast<UBaseWidgetBlueprint>(UBlueprint::GetBlueprintFromClass(Current->ParentClass)))
 	{
 		if (Current->WidgetTree && Current->WidgetTree->RootWidget)
 		{
-			RootTree = Current->WidgetTree;
+			RootOwner = Current;
 		}
 	}
-	if (!RootTree)
+	if (!RootOwner)
 	{
 		return false;
 	}
 
 	OutNames.Reset();
-	auto AddOption = [&OutNames, bOutSkippedDefault](UWidget* Widget)
-		{
-			if (!IsAcceptableOption(Widget))
-			{
-				return;
-			}
-			if (Widget->GetFName() == DefaultPinName)
-			{
-				if (bOutSkippedDefault)
-				{
-					*bOutSkippedDefault = true;
-				}
-				return;
-			}
-			OutNames.AddUnique(Widget->GetFName());
-		};
-	RootTree->ForEachWidget(AddOption);
-	if (Blueprint->WidgetTree && Blueprint->WidgetTree != RootTree)
+	if (OutGuids)
 	{
-		Blueprint->WidgetTree->ForEachWidget(AddOption);
+		OutGuids->Reset();
+	}
+
+	// The GUID comes from the Blueprint that owns the tree, which keeps it across renames
+	auto AddOptionsOf = [&OutNames, OutGuids, bOutSkippedDefault](const UBaseWidgetBlueprint* Owner)
+		{
+			const UWidgetBlueprint* AsWidgetBlueprint = Cast<UWidgetBlueprint>(Owner);
+			Owner->WidgetTree->ForEachWidget([&OutNames, OutGuids, bOutSkippedDefault, AsWidgetBlueprint](UWidget* Widget)
+				{
+					const FName Name = Widget->GetFName();
+					if (!IsAcceptableOption(Widget) || OutNames.Contains(Name))
+					{
+						return;
+					}
+					if (Name == DefaultPinName)
+					{
+						if (bOutSkippedDefault)
+						{
+							*bOutSkippedDefault = true;
+						}
+						return;
+					}
+
+					OutNames.Add(Name);
+					if (OutGuids)
+					{
+						const FGuid* Guid = AsWidgetBlueprint ? AsWidgetBlueprint->WidgetVariableNameToGuidMap.Find(Name) : nullptr;
+						OutGuids->Add(Guid ? *Guid : FGuid());
+					}
+				}
+			);
+		};
+	AddOptionsOf(RootOwner);
+	if (Blueprint != RootOwner && Blueprint->WidgetTree)
+	{
+		AddOptionsOf(Blueprint);
 	}
 	return true;
 }

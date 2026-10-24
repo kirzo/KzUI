@@ -32,6 +32,7 @@ public:
 	virtual void GetMenuActions(FBlueprintActionDatabaseRegistrar& ActionRegistrar) const override;
 	virtual FText GetMenuCategory() const override;
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
+	virtual void ReallocatePinsDuringReconstruction(TArray<UEdGraphPin*>& OldPins) override;
 	virtual bool ShouldShowNodeProperties() const override { return true; }
 	//~ End UK2Node Interface
 
@@ -47,10 +48,14 @@ public:
 private:
 	void RefreshCachedOptionNames();
 
-	/** Option names from the source widget trees. False while the trees are unavailable (the Blueprint is loading). */
-	bool CollectOptionNames(TArray<FName>& OutNames, bool* bOutSkippedDefault = nullptr) const;
+	/** Option names from the source widget trees, with their widget GUIDs. False while the trees are unavailable (the Blueprint is loading). */
+	bool CollectOptionNames(TArray<FName>& OutNames, TArray<FGuid>* OutGuids = nullptr, bool* bOutSkippedDefault = nullptr) const;
 
 	/** Last successfully enumerated option names. Pins are built from these so reconstruction while the widget tree is unavailable (e.g. during editor startup) does not wipe them. */
 	UPROPERTY()
 	TArray<FName> CachedOptionNames;
+
+	/** Widget GUID of each cached name (from WidgetVariableNameToGuidMap), invalid when unknown: a renamed widget keeps its GUID, so its pin and its links follow the new name. */
+	UPROPERTY()
+	TArray<FGuid> CachedOptionGuids;
 };
