@@ -12,5 +12,11 @@ UKzUIIconThemeFactory::UKzUIIconThemeFactory()
 
 UObject* UKzUIIconThemeFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return NewObject<UKzUIIconTheme>(InParent, Class, Name, Flags | RF_Transactional);
+	// One entry per input, so the theme starts as a list to fill in
+	UKzUIIconTheme* Theme = NewObject<UKzUIIconTheme>(InParent, Class, Name, Flags | RF_Transactional);
+	for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
+	{
+		Theme->InputIcons.Add(Input, FKzUIIcon());
+	}
+	return Theme;
 }
