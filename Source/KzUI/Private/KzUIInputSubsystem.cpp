@@ -2,14 +2,12 @@
 
 #include "KzUIInputSubsystem.h"
 #include "KzUserWidget.h"
-#include "KzInputDeviceListener.h"
 #include "KzUIInputPreprocessor.h"
 #include "KzUIInputSettings.h"
 #include "KzUISoundTheme.h"
 #include "KzUIIconTheme.h"
 #include "KzPromptWidget.h"
 
-#include "Blueprint/WidgetTree.h"
 #include "Containers/Ticker.h"
 #include "Engine/AssetManager.h"
 #include "Engine/GameInstance.h"
@@ -407,32 +405,6 @@ void UKzUIInputSubsystem::SetCurrentInputDevice(EKzUIInputDevice NewInputDevice)
 	}
 	CurrentInputDevice = NewInputDevice;
 	ApplyCursorPolicy();
-
-	for (UKzUserWidget* Widget : WidgetStack)
-	{
-		if (!IsValid(Widget))
-		{
-			continue;
-		}
-
-		if (Widget->Implements<UKzInputDeviceListener>())
-		{
-			IKzInputDeviceListener::Execute_OnInputDeviceChanged(Widget, CurrentInputDevice);
-		}
-
-		if (Widget->WidgetTree)
-		{
-			Widget->WidgetTree->ForEachWidget([NewInputDevice](UWidget* Child)
-				{
-					if (Child->Implements<UKzInputDeviceListener>())
-					{
-						IKzInputDeviceListener::Execute_OnInputDeviceChanged(Child, NewInputDevice);
-					}
-				}
-			);
-		}
-	}
-
 	OnInputDeviceChanged.Broadcast(CurrentInputDevice);
 }
 

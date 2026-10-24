@@ -20,8 +20,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FKzUIInputDeviceChangedSignature, EK
 
 /**
  * Tracks the widgets a local player has on screen and the input device they are using.
- * Widgets self-register from UKzUserWidget; device changes come from UInputDeviceSubsystem
- * and are broadcast to every registered widget tree through IKzInputDeviceListener.
+ * Widgets self-register from UKzUserWidget; device changes, read from the input events
+ * themselves by the KzUI input preprocessor, are broadcast through OnInputDeviceChanged.
  */
 UCLASS(DisplayName = "Kz UI Input")
 class KZUI_API UKzUIInputSubsystem : public ULocalPlayerSubsystem
