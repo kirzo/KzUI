@@ -76,6 +76,7 @@ void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 	for (UKzUserWidget* OldPage : GetPageScreens(GetWidgetAtIndex(PreviousIndex)))
 	{
 		OldPage->ClearInput();
+		OldPage->Deactivate();
 		if (Subsystem)
 		{
 			Subsystem->UnregisterWidget(OldPage);
@@ -89,7 +90,7 @@ void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 		{
 			Subsystem->RegisterWidget(NewPage);
 		}
-		NewPage->OnActivated();
+		NewPage->Activate();
 	}
 
 	// The owning screen stays quiet while a managed page owns the input: without this, inputs

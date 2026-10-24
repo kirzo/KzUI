@@ -105,7 +105,22 @@ void UKzUserWidget::NativeConstruct()
 		{
 			Subsystem->RegisterWidget(this);
 		}
-		OnActivated();
+		Activate();
+	}
+}
+
+void UKzUserWidget::Activate()
+{
+	bActive = true;
+	OnActivated();
+}
+
+void UKzUserWidget::Deactivate()
+{
+	if (bActive)
+	{
+		bActive = false;
+		OnDeactivated();
 	}
 }
 
@@ -114,10 +129,16 @@ void UKzUserWidget::OnActivated()
 	ReceiveOnActivated();
 }
 
+void UKzUserWidget::OnDeactivated()
+{
+	ReceiveOnDeactivated();
+}
+
 void UKzUserWidget::NativeDestruct()
 {
 	// Removals that skip RemoveFromParent, like clearing the panel that holds the widget, still close the modal chain
 	ReleaseModalLinks(false);
+	Deactivate();
 
 	// A widget added again later starts with no press in flight
 	ClearInput();
@@ -281,6 +302,7 @@ void UKzUserWidget::RemoveFromStack(bool bPropagate)
 			return;
 		}
 
+		Deactivate();
 		ReceiveOnRemoveFromParent();
 		OnRemovedFromParent.Broadcast(this, bPropagate);
 		SetInputEnabled(false);

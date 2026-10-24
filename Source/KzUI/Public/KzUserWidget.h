@@ -72,6 +72,9 @@ public:
 private:
 	bool bInputEnabled = false;
 
+	/** Between Activate and Deactivate, so OnDeactivated pairs with an OnActivated. */
+	bool bActive = false;
+
 	TMap<EKzUIInputType, FKzUIInputPressedState> InputPressedState;
 
 	UPROPERTY(Transient)
@@ -116,11 +119,23 @@ public:
 	virtual void RemoveFromParent() override;
 	//~ End UUserWidget Interface
 
+	/** Marks the widget active and runs OnActivated. Called by KzUI when the widget registers at construct or its KzWidgetSwitcher page is activated. */
+	void Activate();
+
+	/** Runs OnDeactivated if the widget was active. Called by KzUI when its KzWidgetSwitcher page is left or the widget is removed. */
+	void Deactivate();
+
 	/** The widget became the active screen: registered on the player's stack at construct, or activated as a KzWidgetSwitcher page. */
 	virtual void OnActivated();
 
 	UFUNCTION(Category = "KzUI", BlueprintImplementableEvent, meta = (DisplayName = "On Activated"))
 	void ReceiveOnActivated();
+
+	/** The widget stopped being the active screen: its KzWidgetSwitcher page was left, or it was removed. A modal child opening over it does not count (see On Add Child). */
+	virtual void OnDeactivated();
+
+	UFUNCTION(Category = "KzUI", BlueprintImplementableEvent, meta = (DisplayName = "On Deactivated"))
+	void ReceiveOnDeactivated();
 
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "On Remove From Parent"))
 	void ReceiveOnRemoveFromParent();
