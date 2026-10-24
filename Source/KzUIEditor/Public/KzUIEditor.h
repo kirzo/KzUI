@@ -2,13 +2,13 @@
 
 #pragma once
 
-#include "KzLibEditorModule_Base.h"
+#include "Modules/ModuleInterface.h"
 
-class FKzUIEditorModule : public FKzLibEditorModule_Base
+class FKzUIEditorModule : public IModuleInterface
 {
-protected:
-	virtual void OnStartupModule() override;
-	virtual void OnShutdownModule() override;
+public:
+	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
 
 private:
 	FDelegateHandle BlueprintPreCompileHandle;

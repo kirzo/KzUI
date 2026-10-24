@@ -3,10 +3,16 @@
 #pragma once
 
 #include "Styling/SlateStyle.h"
-#include "KzEditorStyle_Base.h"
 
-class FKzUIEditorStyle : public TKzEditorStyle_Base<FKzUIEditorStyle>
+/** Class icons and thumbnails of the KzUI assets and widgets. */
+class FKzUIEditorStyle : public FSlateStyleSet
 {
 public:
 	FKzUIEditorStyle();
+
+	static void Initialize();
+	static void Shutdown();
+
+private:
+	static TSharedPtr<FKzUIEditorStyle> Instance;
 };

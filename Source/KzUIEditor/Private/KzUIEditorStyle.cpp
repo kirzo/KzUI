@@ -2,10 +2,36 @@
 
 #include "KzUIEditorStyle.h"
 
-FKzUIEditorStyle::FKzUIEditorStyle()
-	: TKzEditorStyle_Base(FName("KzUIEditorStyle"))
+#include "Brushes/SlateImageBrush.h"
+#include "Interfaces/IPluginManager.h"
+#include "Styling/SlateStyleRegistry.h"
+
+TSharedPtr<FKzUIEditorStyle> FKzUIEditorStyle::Instance;
+
+void FKzUIEditorStyle::Initialize()
 {
-	SetupPluginResources(TEXT("KzUI"));
+	if (!Instance)
+	{
+		Instance = MakeShared<FKzUIEditorStyle>();
+		FSlateStyleRegistry::RegisterSlateStyle(*Instance);
+	}
+}
+
+void FKzUIEditorStyle::Shutdown()
+{
+	if (Instance)
+	{
+		FSlateStyleRegistry::UnRegisterSlateStyle(*Instance);
+		Instance.Reset();
+	}
+}
+
+FKzUIEditorStyle::FKzUIEditorStyle()
+	: FSlateStyleSet(FName("KzUIEditorStyle"))
+{
+	const FString ResourcesDir = IPluginManager::Get().FindPlugin(TEXT("KzUI"))->GetBaseDir() / TEXT("Resources");
+	SetContentRoot(ResourcesDir);
+	SetCoreContentRoot(ResourcesDir);
 
 	// White line icon for lists, tabs and menus; colour figure for the Content Browser, which Blueprints of the text styles inherit
 	const TPair<const TCHAR*, const TCHAR*> Classes[] = {

@@ -11,8 +11,7 @@ public class KzUIEditor : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"KzUI",
-				"KzLibEditor"
+				"KzUI"
 			}
 			);
 
@@ -27,9 +26,8 @@ public class KzUIEditor : ModuleRules
 				"KzUIUncooked",
 				"BlueprintGraph",
 				"UnrealEd",
-				"AssetTools",
+				"AssetDefinition",
 				"PropertyEditor",
-				"ComponentVisualizers",
 				"Projects"
 			}
 			);
