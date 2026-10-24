@@ -20,6 +20,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
+#include "HAL/IConsoleManager.h"
 #include "HAL/PlatformProperties.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
@@ -115,6 +116,45 @@ namespace
 		}
 		return nullptr;
 	}
+
+	/** Every local player's subsystem, across every game instance (PIE runs several). */
+	void ForEachSubsystem(TFunctionRef<void(UKzUIInputSubsystem&)> Function)
+	{
+		if (!GEngine)
+		{
+			return;
+		}
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			if (const UGameInstance* GameInstance = Context.OwningGameInstance)
+			{
+				for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
+				{
+					if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(Player))
+					{
+						Function(*Subsystem);
+					}
+				}
+			}
+		}
+	}
+
+	TAutoConsoleVariable<FString> CVarForceDevice(
+		TEXT("kzui.ForceDevice"),
+		TEXT(""),
+		TEXT("Forces the input device family of every player, for icons and key overrides: Keyboard, Xbox, DualShock, DualSense or Switch. Empty goes back to the detected device on the next input."),
+		FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*)
+			{
+				ForEachSubsystem([](UKzUIInputSubsystem& Subsystem) { Subsystem.SetCurrentInputDevice(Subsystem.GetCurrentInputDevice()); });
+			}
+		),
+		ECVF_Cheat);
+
+	TOptional<EKzUIInputDevice> GetForcedDevice()
+	{
+		const int64 Value = StaticEnum<EKzUIInputDevice>()->GetValueByNameString(CVarForceDevice.GetValueOnGameThread());
+		return Value != INDEX_NONE ? TOptional<EKzUIInputDevice>(static_cast<EKzUIInputDevice>(Value)) : TOptional<EKzUIInputDevice>();
+	}
 }
 
 void UKzUIInputSubsystem::HandleInputDeviceConnectionChange(EInputDeviceConnectionState NewConnectionState, FPlatformUserId PlatformUserId, FInputDeviceId InputDeviceId)
@@ -130,23 +170,7 @@ void UKzUIInputSubsystem::HandleInputDeviceConnectionChange(EInputDeviceConnecti
 	}
 
 	// Every player, not only PlatformUserId: a platform may hand a disconnected pad to the unpaired user
-	if (!GEngine)
-	{
-		return;
-	}
-	for (const FWorldContext& Context : GEngine->GetWorldContexts())
-	{
-		if (const UGameInstance* GameInstance = Context.OwningGameInstance)
-		{
-			for (ULocalPlayer* Player : GameInstance->GetLocalPlayers())
-			{
-				if (UKzUIInputSubsystem* Subsystem = Get(Player))
-				{
-					Subsystem->RefreshGamepadConnection(true);
-				}
-			}
-		}
-	}
+	ForEachSubsystem([](UKzUIInputSubsystem& Subsystem) { Subsystem.RefreshGamepadConnection(true); });
 }
 
 void UKzUIInputSubsystem::RefreshGamepadConnection(bool bBroadcast)
@@ -439,6 +463,11 @@ bool UKzUIInputSubsystem::CanTakeFocus() const
 
 void UKzUIInputSubsystem::SetCurrentInputDevice(EKzUIInputDevice NewInputDevice)
 {
+	if (const TOptional<EKzUIInputDevice> Forced = GetForcedDevice())
+	{
+		NewInputDevice = Forced.GetValue();
+	}
+
 	if (NewInputDevice != EKzUIInputDevice::Keyboard)
 	{
 		GamepadDevice = NewInputDevice;

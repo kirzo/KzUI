@@ -104,7 +104,7 @@ public:
 	/** Family of the last pad this player used; it picks the gamepad key overrides, also while on keyboard. */
 	EKzUIInputDevice GetGamepadDevice() const { return GamepadDevice; }
 
-	/** Applies an input device to this player. Normally driven by the input events themselves; call it to force a device. */
+	/** Applies an input device to this player. Normally driven by the input events themselves; call it to force a device. The kzui.ForceDevice console variable overrides whatever is passed. */
 	UFUNCTION(Category = KzUI, BlueprintCallable)
 	void SetCurrentInputDevice(EKzUIInputDevice NewInputDevice);
 
