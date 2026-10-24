@@ -76,6 +76,9 @@ protected:
 	/** Shows the bound setting's current engine value without moving the revert point. Runs whenever any setting changes through UKzSettingsLibrary, so a row follows what another row changed. */
 	virtual void ShowCurrentSetting() {}
 
+	/** The change this row scheduled was just applied. */
+	virtual void OnSettingsApplied() {}
+
 private:
 	/** Seconds left before the scheduled apply; negative with none pending. */
 	float ApplyCountdown = -1.0f;
@@ -110,6 +113,20 @@ public:
 	/** Shown while no value is selected, e.g. mixed quality levels. The next step lands on a real value. */
 	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere)
 	FText CustomText;
+
+	/** Seconds a Resolution or WindowMode row that applies immediately gives the player to keep the new video mode, in a prompt opened on the owning screen; out of time or cancelled, it reverts. 0 applies without asking. */
+	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere, meta = (ClampMin = 0, EditCondition = "Setting == EKzUIStandardSetting::Resolution || Setting == EKzUIStandardSetting::WindowMode", EditConditionHides))
+	float VideoConfirmTime = 15.0f;
+
+	/** A {Seconds} argument counts down. */
+	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere, meta = (EditCondition = "Setting == EKzUIStandardSetting::Resolution || Setting == EKzUIStandardSetting::WindowMode", EditConditionHides))
+	FText VideoConfirmMessage;
+
+	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere, meta = (EditCondition = "Setting == EKzUIStandardSetting::Resolution || Setting == EKzUIStandardSetting::WindowMode", EditConditionHides))
+	FText VideoKeepText;
+
+	UPROPERTY(Category = "KzUI|Spinner", EditAnywhere, meta = (EditCondition = "Setting == EKzUIStandardSetting::Resolution || Setting == EKzUIStandardSetting::WindowMode", EditConditionHides))
+	FText VideoRevertText;
 
 	UPROPERTY(Category = "KzUI|Events", BlueprintAssignable)
 	FKzSpinnerValueChangedSignature OnValueChanged;
@@ -159,7 +176,13 @@ public:
 	UFUNCTION(Category = "KzUI|Spinner", BlueprintImplementableEvent, meta = (DisplayName = "On Stepped"))
 	void ReceiveOnStepped(bool bForward);
 
+protected:
+	virtual void OnSettingsApplied() override;
+
 private:
+	UFUNCTION()
+	void OnVideoModeAnswered(bool bKeep);
+
 	bool Step(int32 Delta);
 
 	void RefreshValueText();

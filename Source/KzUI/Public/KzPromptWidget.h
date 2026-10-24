@@ -48,12 +48,17 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (ExposeOnSpawn = true))
 	bool bDefaultToCancel = false;
 
+	/** Seconds until the prompt cancels itself, 0 for never. A {Seconds} argument in Message counts down. */
+	UPROPERTY(BlueprintReadOnly, meta = (ExposeOnSpawn = true))
+	float AutoCancelTime = 0.0f;
+
 public:
 	UKzPromptWidget(const FObjectInitializer& ObjectInitializer);
 
 	//~ Begin UUserWidget Interface
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	//~ End UUserWidget Interface
 
 	//~ Begin UKzUserWidget Interface
@@ -83,6 +88,15 @@ public:
 	UFUNCTION(Category = "KzUI|Prompt", BlueprintImplementableEvent, meta = (DisplayName = "On Cancel"))
 	void ReceiveOnCancel();
 
+	/** Seconds left before the prompt cancels itself; meaningless without AutoCancelTime. */
+	UFUNCTION(Category = "KzUI|Prompt", BlueprintPure)
+	float GetRemainingTime() const { return RemainingTime; }
+
 private:
+	/** Sets the message, with the countdown filled in. */
+	void RefreshMessage();
+
 	bool bAnswered = false;
+
+	float RemainingTime = 0.0f;
 };

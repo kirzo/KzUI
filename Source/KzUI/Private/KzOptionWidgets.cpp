@@ -76,6 +76,7 @@ void UKzOptionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		if (ApplyCountdown < 0.0f)
 		{
 			UKzSettingsLibrary::ApplySettings();
+			OnSettingsApplied();
 		}
 	}
 }
@@ -112,6 +113,35 @@ UKzSpinner::UKzSpinner(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	CustomText = LOCTEXT("SpinnerCustom", "Custom");
+	VideoConfirmMessage = LOCTEXT("VideoConfirmMessage", "Keep these display settings? Reverting in {Seconds} s.");
+	VideoKeepText = LOCTEXT("VideoKeep", "Keep");
+	VideoRevertText = LOCTEXT("VideoRevert", "Revert");
+}
+
+void UKzSpinner::OnSettingsApplied()
+{
+	const bool bVideoMode = Setting == EKzUIStandardSetting::Resolution || Setting == EKzUIStandardSetting::WindowMode;
+	UKzUserWidget* Screen = GetTypedOuter<UKzUserWidget>();
+	if (!bVideoMode || VideoConfirmTime <= 0.0f || !Screen || !UKzSettingsLibrary::IsVideoModeUnconfirmed())
+	{
+		return;
+	}
+
+	FKzUIPromptResultDelegate OnResult;
+	OnResult.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(UKzSpinner, OnVideoModeAnswered));
+	Screen->ShowPrompt(VideoConfirmMessage, VideoKeepText, VideoRevertText, OnResult, false, VideoConfirmTime);
+}
+
+void UKzSpinner::OnVideoModeAnswered(bool bKeep)
+{
+	if (bKeep)
+	{
+		UKzSettingsLibrary::ConfirmVideoMode();
+	}
+	else
+	{
+		UKzSettingsLibrary::RevertVideoMode(true);
+	}
 }
 
 void UKzSpinner::NativePreConstruct()

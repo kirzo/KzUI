@@ -77,6 +77,18 @@ public:
 	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
 	static void ApplySettings();
 
+	/** Whether the resolution or window mode in use is not the last one the player confirmed. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintPure)
+	static bool IsVideoModeUnconfirmed();
+
+	/** Keeps the current resolution and window mode as the ones RevertVideoMode returns to. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
+	static void ConfirmVideoMode();
+
+	/** Goes back to the last confirmed resolution and window mode. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
+	static void RevertVideoMode(bool bApply = true);
+
 	/** Broadcast after any setting changes through this library, so option rows can show what other rows changed (the quality groups after the overall level, for instance). */
 	static FSimpleMulticastDelegate& OnSettingChanged();
 

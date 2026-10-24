@@ -182,6 +182,25 @@ void UKzSettingsLibrary::ApplySettings()
 	UGameUserSettings::GetGameUserSettings()->ApplySettings(false);
 }
 
+bool UKzSettingsLibrary::IsVideoModeUnconfirmed()
+{
+	const UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+	return Settings->GetScreenResolution() != Settings->GetLastConfirmedScreenResolution() || Settings->GetFullscreenMode() != Settings->GetLastConfirmedFullscreenMode();
+}
+
+void UKzSettingsLibrary::ConfirmVideoMode()
+{
+	UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+	Settings->ConfirmVideoMode();
+	Settings->SaveSettings();
+}
+
+void UKzSettingsLibrary::RevertVideoMode(bool bApply)
+{
+	UGameUserSettings::GetGameUserSettings()->RevertVideoMode();
+	NotifyChanged(bApply);
+}
+
 FSimpleMulticastDelegate& UKzSettingsLibrary::OnSettingChanged()
 {
 	static FSimpleMulticastDelegate Delegate;

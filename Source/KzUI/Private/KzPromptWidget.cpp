@@ -17,7 +17,8 @@ UKzPromptWidget::UKzPromptWidget(const FObjectInitializer& ObjectInitializer)
 void UKzPromptWidget::NativeConstruct()
 {
 	bAnswered = false;
-	MessageText->SetText(Message);
+	RemainingTime = AutoCancelTime;
+	RefreshMessage();
 	if (ConfirmText)
 	{
 		ConfirmText->SetText(ConfirmMessage);
@@ -38,7 +39,31 @@ void UKzPromptWidget::NativeConstruct()
 
 	Super::NativeConstruct();
 }
+
+void UKzPromptWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (AutoCancelTime > 0.0f && !bAnswered)
+	{
+		const int32 SecondsBefore = FMath::CeilToInt(RemainingTime);
+		RemainingTime -= InDeltaTime;
+		if (RemainingTime <= 0.0f)
+		{
+			Cancel();
+		}
+		else if (FMath::CeilToInt(RemainingTime) != SecondsBefore)
+		{
+			RefreshMessage();
+		}
+	}
+}
 //~ End UUserWidget Interface
+
+void UKzPromptWidget::RefreshMessage()
+{
+	MessageText->SetText(AutoCancelTime > 0.0f ? FText::FormatNamed(Message, TEXT("Seconds"), FMath::CeilToInt(RemainingTime)) : Message);
+}
 
 //~ Begin UKzUserWidget Interface
 bool UKzPromptWidget::CanHandleAcceptInput_Implementation()
