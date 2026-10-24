@@ -51,6 +51,12 @@ public:
 	UPROPERTY(Category = Icon, EditAnywhere)
 	bool bApplyColorToIcons = false;
 
+#if WITH_EDITORONLY_DATA
+	/** Device the icons are previewed for in the designer. */
+	UPROPERTY(Category = Icon, EditAnywhere)
+	EKzUIInputDevice PreviewDevice = EKzUIInputDevice::Keyboard;
+#endif
+
 	/** Size the icons to the text line height. */
 	UPROPERTY(Category = Icon, EditAnywhere)
 	bool bAutoIconSize = true;

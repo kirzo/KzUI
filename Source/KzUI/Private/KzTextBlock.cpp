@@ -111,6 +111,21 @@ void UKzTextBlock::SynchronizeProperties()
 	ApplyStyle();
 	Super::SynchronizeProperties();
 	RebuildContent();
+
+#if WITH_EDITOR
+	// A new preview device changes no content, so the icons are refreshed in place
+	if (IsDesignTime())
+	{
+		for (UKzInputIcon* Icon : GeneratedIcons)
+		{
+			if (Icon && Icon->PreviewDevice != PreviewDevice)
+			{
+				Icon->PreviewDevice = PreviewDevice;
+				Icon->SynchronizeProperties();
+			}
+		}
+	}
+#endif
 }
 
 void UKzTextBlock::OnJustificationChanged(ETextJustify::Type InJustification)
@@ -516,6 +531,7 @@ void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variat
 	// Generated widgets do not inherit the designer flags, and without them the icon resolves
 	// through the (absent) game subsystem instead of the design-time preview path
 	Icon->SetDesignerFlags(GetDesignerFlags());
+	Icon->PreviewDevice = PreviewDevice;
 #endif
 	Icon->CustomToken = CustomToken;
 	Icon->Variation = Variation;
