@@ -134,6 +134,27 @@ void UKzUserWidget::OnDeactivated()
 	ReceiveOnDeactivated();
 }
 
+bool UKzUserWidget::SwitchTab(bool bForward, bool bRepeat)
+{
+	bool bOnActivePage = true;
+	UKzWidgetSwitcher* Switcher = UKzWidgetSwitcher::FindOwningSwitcher(this, bOnActivePage);
+	if (!Switcher || !bOnActivePage || Switcher->Mode != EKzUISwitcherMode::Tabs)
+	{
+		return false;
+	}
+
+	// The repeats of a held shoulder are taken but do not keep cycling
+	if (!bRepeat && bForward)
+	{
+		Switcher->NextPage();
+	}
+	else if (!bRepeat)
+	{
+		Switcher->PreviousPage();
+	}
+	return true;
+}
+
 void UKzUserWidget::NativeDestruct()
 {
 	// Removals that skip RemoveFromParent, like clearing the panel that holds the widget, still close the modal chain
@@ -161,6 +182,11 @@ FReply UKzUserWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEve
 		{
 			// Only inputs the widget actually handled are consumed; rejected ones bubble, though Slate keeps navigation keys
 			if (ProcessInputPressed(Input, Key, InKeyEvent.IsRepeat()) == EKzUIInputResult::Handled)
+			{
+				Reply = FReply::Handled();
+			}
+			// A tab page leaves the Previous/Next it does not handle to its switcher, one tab per press
+			else if ((Input == EKzUIInputType::Previous || Input == EKzUIInputType::Next) && SwitchTab(Input == EKzUIInputType::Next, InKeyEvent.IsRepeat()))
 			{
 				Reply = FReply::Handled();
 			}
@@ -286,14 +312,14 @@ void UKzUserWidget::RemoveFromStack(bool bPropagate)
 	if (bOnScreen && !IsDesignTime() && !HasAnyFlags(RF_ClassDefaultObject | RF_BeginDestroyed))
 	{
 		// A switcher page closes by handing control back to the switcher, not by removing itself.
-		// Propagating, the chain goes on through the screen hosting the switcher
+		// Propagating, or as a tab, it removes the screen hosting the switcher instead
 		bool bOnActivePage = true;
 		if (UKzWidgetSwitcher* Switcher = UKzWidgetSwitcher::FindOwningSwitcher(this, bOnActivePage))
 		{
-			UKzUserWidget* Screen = bPropagate ? Switcher->GetOwningScreen() : nullptr;
+			UKzUserWidget* Screen = bPropagate || Switcher->Mode == EKzUISwitcherMode::Tabs ? Switcher->GetOwningScreen() : nullptr;
 			if (Screen)
 			{
-				Screen->RemoveFromStack(true);
+				Screen->RemoveFromStack(bPropagate);
 			}
 			else if (bOnActivePage)
 			{

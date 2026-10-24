@@ -250,6 +250,9 @@ private:
 	/** Removes the modal child and hands control back to the owner, if this is a modal child. */
 	void ReleaseModalLinks(bool bPropagate);
 
+	/** On the active page of a KzWidgetSwitcher in Tabs mode, moves to the next or previous tab. Returns whether the press belongs to the switcher. */
+	bool SwitchTab(bool bForward, bool bRepeat);
+
 	EKzUIInputResult FireInputReleased(const EKzUIInputType Input, bool bCancelled);
 
 	/** FireInputTriggered for a key press, recording whether the press was consumed. */

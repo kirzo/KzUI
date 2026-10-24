@@ -59,9 +59,27 @@ void UKzWidgetSwitcher::GoBack()
 	SetActiveWidgetIndex(Target);
 }
 
+void UKzWidgetSwitcher::NextPage()
+{
+	const int32 Count = GetNumWidgets();
+	if (Count > 0)
+	{
+		SetActiveWidgetIndex((GetActiveWidgetIndex() + 1) % Count);
+	}
+}
+
+void UKzWidgetSwitcher::PreviousPage()
+{
+	const int32 Count = GetNumWidgets();
+	if (Count > 0)
+	{
+		SetActiveWidgetIndex((GetActiveWidgetIndex() + Count - 1) % Count);
+	}
+}
+
 void UKzWidgetSwitcher::HandleActivePageChanged(int32 PreviousIndex)
 {
-	if (!bNavigatingBack)
+	if (!bNavigatingBack && Mode == EKzUISwitcherMode::History)
 	{
 		PageHistory.Push(PreviousIndex);
 	}
