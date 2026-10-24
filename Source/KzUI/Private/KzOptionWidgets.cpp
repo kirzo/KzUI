@@ -3,6 +3,7 @@
 #include "KzOptionWidgets.h"
 #include "KzNavigableWidget.h"
 #include "KzTextBlock.h"
+#include "KzUIInputSettings.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
@@ -39,6 +40,53 @@ void UKzOptionWidget::SetUnavailableReason(const FText& Reason)
 			Text->SetUnavailableReason(Reason);
 		}
 	}
+}
+
+static bool IsCursorOver(const UWidget* Widget, const FPointerEvent& MouseEvent)
+{
+	return Widget && Widget->IsVisible() && Widget->GetCachedGeometry().IsUnderLocation(MouseEvent.GetScreenSpacePosition());
+}
+
+bool UKzOptionWidget::CanUseMouse() const
+{
+	const UKzNavigableWidget* Owner = GetTypedOuter<UKzNavigableWidget>();
+	return UKzUIInputSettings::Get()->bSupportsMouse && UnavailableReason.IsEmpty() && Owner && Owner->IsInputEnabled();
+}
+
+bool UKzOptionWidget::StepByMouse(int32 Delta)
+{
+	if (!StepValue(Delta))
+	{
+		return false;
+	}
+	if (UKzNavigableWidget* Owner = GetTypedOuter<UKzNavigableWidget>())
+	{
+		Owner->PlayHoverSound();
+	}
+	return true;
+}
+
+FReply UKzOptionWidget::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// A wheel that moves nothing (a toggle, a value at its end) scrolls the list instead
+	if (CanUseMouse() && StepByMouse(InMouseEvent.GetWheelDelta() > 0.0f ? 1 : -1))
+	{
+		return FReply::Handled();
+	}
+	return Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+}
+
+FReply UKzOptionWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && CanUseMouse())
+	{
+		if (IsCursorOver(PreviousArrow, InMouseEvent) || IsCursorOver(NextArrow, InMouseEvent))
+		{
+			StepByMouse(IsCursorOver(NextArrow, InMouseEvent) ? 1 : -1);
+			return FReply::Handled();
+		}
+	}
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 void UKzOptionWidget::MarkUnsupported(EKzUIStandardSetting Setting)
@@ -332,9 +380,71 @@ bool UKzSlider::WantsInput_Implementation(EKzUIInputType Input) const
 
 bool UKzSlider::HandleInput_Implementation(EKzUIInputType Input)
 {
+	return StepValue(Input == EKzUIInputType::Left ? -1 : 1);
+}
+
+bool UKzSlider::StepValue(int32 Delta)
+{
 	const float Previous = Value;
-	SetValue(Value + (Input == EKzUIInputType::Left ? -Step : Step));
+	SetValue(Value + Delta * Step);
 	return !FMath::IsNearlyEqual(Previous, Value);
+}
+
+FReply UKzSlider::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && CanUseMouse() && Bar && Bar->GetCachedGeometry().IsUnderLocation(InMouseEvent.GetScreenSpacePosition()))
+	{
+		bDragging = true;
+		DragTo(InMouseEvent);
+		return FReply::Handled().CaptureMouse(TakeWidget());
+	}
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UKzSlider::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (bDragging)
+	{
+		DragTo(InMouseEvent);
+		return FReply::Handled();
+	}
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UKzSlider::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (bDragging && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bDragging = false;
+		return FReply::Handled().ReleaseMouseCapture();
+	}
+	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+void UKzSlider::NativeOnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent)
+{
+	bDragging = false;
+	Super::NativeOnMouseCaptureLost(CaptureLostEvent);
+}
+
+void UKzSlider::DragTo(const FPointerEvent& MouseEvent)
+{
+	const FGeometry& Geometry = Bar->GetCachedGeometry();
+	const float Width = Geometry.GetLocalSize().X;
+	if (Width <= 0.0f)
+	{
+		return;
+	}
+
+	const float Previous = Value;
+	SetValue(FMath::GridSnap(Geometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X / Width, Step));
+	if (!FMath::IsNearlyEqual(Previous, Value))
+	{
+		if (UKzNavigableWidget* Owner = GetTypedOuter<UKzNavigableWidget>())
+		{
+			Owner->PlayHoverSound();
+		}
+	}
 }
 
 void UKzSlider::SetValue(float NewValue)

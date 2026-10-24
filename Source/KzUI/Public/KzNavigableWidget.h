@@ -147,7 +147,7 @@ public:
 	UFUNCTION(Category = "KzUI|Navigation", BlueprintCallable)
 	bool HasChangedOptions() const;
 
-protected:
+	/** The theme's hover sound, or HoverSoundOverride. Also played by options that act on their own, like a row stepped with the mouse. */
 	void PlayHoverSound();
 
 	void PlaySelectSound();

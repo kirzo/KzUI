@@ -65,10 +65,29 @@ public:
 	//~ End IKzSelectableWidgetInterface
 
 protected:
+	/** Clicked with the mouse, steps the value down (spinner and slider). */
+	UPROPERTY(Category = "KzUI", BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> PreviousArrow;
+
+	/** Clicked with the mouse, steps the value up (spinner and slider). */
+	UPROPERTY(Category = "KzUI", BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> NextArrow;
+
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeDestruct() override;
+	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	/** Whether the mouse may act on the row: the game supports it, the row is available and its navigable widget takes input. */
+	bool CanUseMouse() const;
+
+	/** Moves the value by Delta steps for the mouse wheel and arrows. Returns whether it changed. */
+	virtual bool StepValue(int32 Delta) { return false; }
+
+	/** StepValue with the owning navigable widget's hover sound when it acted, as a key step would sound. */
+	bool StepByMouse(int32 Delta);
 
 	/** With bApplyImmediately, applies the settings once the value has rested for a moment. */
 	void ScheduleApply();
@@ -181,6 +200,7 @@ public:
 
 protected:
 	virtual void OnSettingsApplied() override;
+	virtual bool StepValue(int32 Delta) override { return Step(Delta); }
 
 private:
 	UFUNCTION()
@@ -234,6 +254,13 @@ protected:
 	//~ End IKzSelectableWidgetInterface
 
 	virtual void ShowCurrentSetting() override;
+	virtual bool StepValue(int32 Delta) override;
+
+	/** Pressing on the Bar starts a drag that sets the value under the cursor, snapped to Step. */
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeOnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent) override;
 
 public:
 	virtual void Revert_Implementation() override { SetValue(InitialValue); }
@@ -249,7 +276,12 @@ public:
 private:
 	void RefreshValueVisuals();
 
+	/** Sets the value from the cursor's position along the Bar. */
+	void DragTo(const FPointerEvent& MouseEvent);
+
 	float InitialValue = 1.0f;
+
+	bool bDragging = false;
 };
 
 /** Option row that flips a boolean with Accept while hovered. For Left/Right adjustment use a two-option UKzSpinner instead. Bind ValueText and/or ValueImage to display the state. */
