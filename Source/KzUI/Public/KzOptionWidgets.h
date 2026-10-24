@@ -66,15 +66,21 @@ public:
 
 protected:
 	virtual void NativePreConstruct() override;
+	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeDestruct() override;
 
 	/** With bApplyImmediately, applies the settings once the value has rested for a moment. */
 	void ScheduleApply();
 
+	/** Shows the bound setting's current engine value without moving the revert point. Runs whenever any setting changes through UKzSettingsLibrary, so a row follows what another row changed. */
+	virtual void ShowCurrentSetting() {}
+
 private:
 	/** Seconds left before the scheduled apply; negative with none pending. */
 	float ApplyCountdown = -1.0f;
+
+	FDelegateHandle SettingChangedHandle;
 };
 
 /** Option row that cycles a list of values with Left/Right while hovered. Bind ValueText to display the current value. */
@@ -120,6 +126,8 @@ protected:
 	virtual bool WantsInput_Implementation(EKzUIInputType Input) const override;
 	virtual bool HandleInput_Implementation(EKzUIInputType Input) override;
 	//~ End IKzSelectableWidgetInterface
+
+	virtual void ShowCurrentSetting() override;
 
 public:
 	UKzSpinner(const FObjectInitializer& ObjectInitializer);
@@ -199,6 +207,8 @@ protected:
 	virtual bool HandleInput_Implementation(EKzUIInputType Input) override;
 	//~ End IKzSelectableWidgetInterface
 
+	virtual void ShowCurrentSetting() override;
+
 public:
 	virtual void Revert_Implementation() override { SetValue(InitialValue); }
 	virtual bool HasChanges_Implementation() const override { return !FMath::IsNearlyEqual(Value, InitialValue, UE_KINDA_SMALL_NUMBER); }
@@ -261,6 +271,8 @@ protected:
 	virtual bool WantsInput_Implementation(EKzUIInputType Input) const override;
 	virtual bool HandleInput_Implementation(EKzUIInputType Input) override;
 	//~ End IKzSelectableWidgetInterface
+
+	virtual void ShowCurrentSetting() override;
 
 public:
 	UKzToggle(const FObjectInitializer& ObjectInitializer);

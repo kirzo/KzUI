@@ -77,8 +77,15 @@ public:
 	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable)
 	static void ApplySettings();
 
+	/** Broadcast after any setting changes through this library, so option rows can show what other rows changed (the quality groups after the overall level, for instance). */
+	static FSimpleMulticastDelegate& OnSettingChanged();
+
 	static FKzUISettingState CaptureSettingState();
 
 	/** Puts back what CaptureSettingState read for Resolution or Quality. Quality restores every group, since Overall is the one that sits outside its options. */
 	static void RestoreSettingState(EKzUIStandardSetting Setting, const FKzUISettingState& State, bool bApply = true);
+
+private:
+	/** Applies when asked and broadcasts OnSettingChanged. */
+	static void NotifyChanged(bool bApply);
 };

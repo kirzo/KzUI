@@ -80,8 +80,16 @@ void UKzOptionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 }
 
+void UKzOptionWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	SettingChangedHandle = UKzSettingsLibrary::OnSettingChanged().AddUObject(this, &UKzOptionWidget::ShowCurrentSetting);
+}
+
 void UKzOptionWidget::NativeDestruct()
 {
+	UKzSettingsLibrary::OnSettingChanged().Remove(SettingChangedHandle);
+
 	// A screen closed right after a change still applies it
 	if (ApplyCountdown >= 0.0f)
 	{
@@ -126,6 +134,16 @@ void UKzSpinner::Resync_Implementation()
 		InitialState = UKzSettingsLibrary::CaptureSettingState();
 	}
 	InitialIndex = SelectedIndex;
+}
+
+void UKzSpinner::ShowCurrentSetting()
+{
+	if (Setting != EKzUIStandardSetting::None)
+	{
+		const int32 Index = UKzSettingsLibrary::GetSettingIndex(Setting, QualitySetting);
+		SelectedIndex = Values.IsValidIndex(Index) ? Index : INDEX_NONE;
+		RefreshValueText();
+	}
 }
 
 void UKzSpinner::Revert_Implementation()
@@ -259,6 +277,15 @@ void UKzSlider::Resync_Implementation()
 	InitialValue = Value;
 }
 
+void UKzSlider::ShowCurrentSetting()
+{
+	if (Setting != EKzUIStandardSetting::None)
+	{
+		Value = UKzSettingsLibrary::GetSettingValue(Setting);
+		RefreshValueVisuals();
+	}
+}
+
 bool UKzSlider::WantsInput_Implementation(EKzUIInputType Input) const
 {
 	return Input == EKzUIInputType::Left || Input == EKzUIInputType::Right;
@@ -330,6 +357,15 @@ void UKzToggle::Resync_Implementation()
 		RefreshValueVisuals();
 	}
 	bInitialChecked = bChecked;
+}
+
+void UKzToggle::ShowCurrentSetting()
+{
+	if (Setting != EKzUIStandardSetting::None)
+	{
+		bChecked = UKzSettingsLibrary::GetSettingEnabled(Setting);
+		RefreshValueVisuals();
+	}
 }
 
 bool UKzToggle::WantsInput_Implementation(EKzUIInputType Input) const

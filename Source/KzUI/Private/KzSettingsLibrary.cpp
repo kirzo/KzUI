@@ -142,10 +142,7 @@ void UKzSettingsLibrary::SetSettingIndex(EKzUIStandardSetting Setting, int32 Ind
 			return;
 	}
 
-	if (bApply)
-	{
-		ApplySettings();
-	}
+	NotifyChanged(bApply);
 }
 
 bool UKzSettingsLibrary::GetSettingEnabled(EKzUIStandardSetting Setting)
@@ -161,10 +158,7 @@ void UKzSettingsLibrary::SetSettingEnabled(EKzUIStandardSetting Setting, bool bE
 	}
 
 	UGameUserSettings::GetGameUserSettings()->SetVSyncEnabled(bEnabled);
-	if (bApply)
-	{
-		ApplySettings();
-	}
+	NotifyChanged(bApply);
 }
 
 float UKzSettingsLibrary::GetSettingValue(EKzUIStandardSetting Setting)
@@ -180,15 +174,27 @@ void UKzSettingsLibrary::SetSettingValue(EKzUIStandardSetting Setting, float Val
 	}
 
 	UGameUserSettings::GetGameUserSettings()->SetResolutionScaleNormalized(FMath::Clamp(Value, 0.0f, 1.0f));
-	if (bApply)
-	{
-		ApplySettings();
-	}
+	NotifyChanged(bApply);
 }
 
 void UKzSettingsLibrary::ApplySettings()
 {
 	UGameUserSettings::GetGameUserSettings()->ApplySettings(false);
+}
+
+FSimpleMulticastDelegate& UKzSettingsLibrary::OnSettingChanged()
+{
+	static FSimpleMulticastDelegate Delegate;
+	return Delegate;
+}
+
+void UKzSettingsLibrary::NotifyChanged(bool bApply)
+{
+	if (bApply)
+	{
+		ApplySettings();
+	}
+	OnSettingChanged().Broadcast();
 }
 
 FKzUISettingState UKzSettingsLibrary::CaptureSettingState()
@@ -213,10 +219,7 @@ void UKzSettingsLibrary::RestoreSettingState(EKzUIStandardSetting Setting, const
 			return;
 	}
 
-	if (bApply)
-	{
-		ApplySettings();
-	}
+	NotifyChanged(bApply);
 }
 
 #undef LOCTEXT_NAMESPACE
