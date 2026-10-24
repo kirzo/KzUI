@@ -391,7 +391,7 @@ void UKzUserWidget::AddDynamicChild(UKzUserWidget* Content, int32 ZOrder, bool b
 	OnAddChild(Content);
 }
 
-UKzPromptWidget* UKzUserWidget::ShowPrompt(FText Message, FText ConfirmMessage, FText CancelMessage, FKzUISimpleDelegate OnConfirm, FKzUISimpleDelegate OnCancel, TSubclassOf<UKzPromptWidget> ClassOverride)
+UKzPromptWidget* UKzUserWidget::ShowPrompt(FText Message, FText ConfirmMessage, FText CancelMessage, FKzUIPromptResultDelegate OnResult, bool bDefaultToCancel, TSubclassOf<UKzPromptWidget> ClassOverride)
 {
 	TSubclassOf<UKzPromptWidget> PromptClass = ClassOverride ? ClassOverride : TSubclassOf<UKzPromptWidget>(UKzUIInputSettings::Get()->PromptClass.LoadSynchronous());
 	if (!PromptClass)
@@ -408,8 +408,8 @@ UKzPromptWidget* UKzUserWidget::ShowPrompt(FText Message, FText ConfirmMessage, 
 	Prompt->Message = Message;
 	Prompt->ConfirmMessage = ConfirmMessage;
 	Prompt->CancelMessage = CancelMessage;
-	Prompt->OnConfirm.Delegate = OnConfirm;
-	Prompt->OnCancel.Delegate = OnCancel;
+	Prompt->OnResult.Delegate = OnResult;
+	Prompt->bDefaultToCancel = bDefaultToCancel;
 	AddDynamicChild(Prompt);
 	return Prompt;
 }

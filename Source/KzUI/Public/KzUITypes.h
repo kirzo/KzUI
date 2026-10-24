@@ -169,14 +169,14 @@ public:
 	FKzUIInputDefinition GetInputDefinition(EKzUIInputDevice GamepadDevice) const;
 };
 
-DECLARE_DYNAMIC_DELEGATE(FKzUISimpleDelegate);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FKzUIPromptResultDelegate, bool, bConfirmed);
 
-/** Wraps a dynamic delegate so it can be passed around as an ExposeOnSpawn property. */
+/** Wraps the prompt result delegate so it can be passed around as an ExposeOnSpawn property. */
 USTRUCT(BlueprintType)
-struct KZUI_API FKzUIDelegateWrapper
+struct KZUI_API FKzUIPromptResultWrapper
 {
 	GENERATED_BODY()
 
 	UPROPERTY(Category = Delegate, BlueprintReadWrite)
-	FKzUISimpleDelegate Delegate;
+	FKzUIPromptResultDelegate Delegate;
 };

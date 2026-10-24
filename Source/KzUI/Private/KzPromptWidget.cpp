@@ -16,6 +16,7 @@ UKzPromptWidget::UKzPromptWidget(const FObjectInitializer& ObjectInitializer)
 //~ Begin UUserWidget Interface
 void UKzPromptWidget::NativeConstruct()
 {
+	bAnswered = false;
 	MessageText->SetText(Message);
 	if (ConfirmText)
 	{
@@ -103,6 +104,10 @@ TArray<UWidget*> UKzPromptWidget::GetOptions_Implementation() const
 
 UWidget* UKzPromptWidget::GetDefaultOption_Implementation() const
 {
+	if (bDefaultToCancel && Options.Contains(CancelText.Get()))
+	{
+		return CancelText;
+	}
 	return HasAnyOption() ? Options[0].Get() : nullptr;
 }
 //~ End UKzNavigableWidget Interface
@@ -122,6 +127,13 @@ void UKzPromptWidget::PlayInputSound(EKzUIInputType Input)
 
 void UKzPromptWidget::Confirm()
 {
+	// Callable from Blueprint too: a prompt answers once
+	if (bAnswered)
+	{
+		return;
+	}
+	bAnswered = true;
+
 	SetInputEnabled(false);
 	PlaySelectSound();
 	if (bCloseOnResult)
@@ -129,11 +141,17 @@ void UKzPromptWidget::Confirm()
 		RemoveFromStack(false);
 	}
 	ReceiveOnConfirm();
-	OnConfirm.Delegate.ExecuteIfBound();
+	OnResult.Delegate.ExecuteIfBound(true);
 }
 
 void UKzPromptWidget::Cancel()
 {
+	if (bAnswered)
+	{
+		return;
+	}
+	bAnswered = true;
+
 	SetInputEnabled(false);
 	Super::PlayInputSound(EKzUIInputType::Back);
 	if (bCloseOnResult)
@@ -141,5 +159,5 @@ void UKzPromptWidget::Cancel()
 		RemoveFromStack(false);
 	}
 	ReceiveOnCancel();
-	OnCancel.Delegate.ExecuteIfBound();
+	OnResult.Delegate.ExecuteIfBound(false);
 }

@@ -152,9 +152,9 @@ public:
 	UFUNCTION(Category = "KzUI|Children", BlueprintCallable)
 	void AddDynamicChild(UKzUserWidget* Content, int32 ZOrder = 0, bool bHideWhileOpen = false);
 
-	/** Opens the project-settings prompt (or ClassOverride) as this widget's dynamic child. */
-	UFUNCTION(Category = "KzUI|Children", BlueprintCallable, meta = (AdvancedDisplay = "ClassOverride", AutoCreateRefTerm = "OnConfirm,OnCancel"))
-	UKzPromptWidget* ShowPrompt(FText Message, FText ConfirmMessage, FText CancelMessage, FKzUISimpleDelegate OnConfirm, FKzUISimpleDelegate OnCancel, TSubclassOf<UKzPromptWidget> ClassOverride = nullptr);
+	/** Opens the project-settings prompt (or ClassOverride) as this widget's dynamic child. OnResult gets true on Confirm and false on Cancel; bDefaultToCancel starts the hover on Cancel, for destructive prompts. */
+	UFUNCTION(Category = "KzUI|Children", BlueprintCallable, meta = (AdvancedDisplay = "bDefaultToCancel,ClassOverride", AutoCreateRefTerm = "OnResult"))
+	UKzPromptWidget* ShowPrompt(FText Message, FText ConfirmMessage, FText CancelMessage, FKzUIPromptResultDelegate OnResult, bool bDefaultToCancel = false, TSubclassOf<UKzPromptWidget> ClassOverride = nullptr);
 
 	UFUNCTION(Category = "KzUI|Children", BlueprintCallable)
 	UKzUserWidget* CreateSlottedDynamicChild(UPanelWidget* Panel, TSubclassOf<UKzUserWidget> ContentClass);

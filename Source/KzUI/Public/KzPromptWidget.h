@@ -40,11 +40,13 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (ExposeOnSpawn = true))
 	FText CancelMessage;
 
+	/** Called with true on Confirm and false on Cancel. */
 	UPROPERTY(BlueprintReadOnly, meta = (ExposeOnSpawn = true))
-	FKzUIDelegateWrapper OnConfirm;
+	FKzUIPromptResultWrapper OnResult;
 
+	/** The hover starts on the cancel option, for destructive prompts. */
 	UPROPERTY(BlueprintReadOnly, meta = (ExposeOnSpawn = true))
-	FKzUIDelegateWrapper OnCancel;
+	bool bDefaultToCancel = false;
 
 public:
 	UKzPromptWidget(const FObjectInitializer& ObjectInitializer);
@@ -69,7 +71,10 @@ public:
 	//~ End UKzNavigableWidget Interface
 
 public:
+	UFUNCTION(Category = "KzUI|Prompt", BlueprintCallable)
 	void Confirm();
+
+	UFUNCTION(Category = "KzUI|Prompt", BlueprintCallable)
 	void Cancel();
 
 	UFUNCTION(Category = "KzUI|Prompt", BlueprintImplementableEvent, meta = (DisplayName = "On Confirm"))
@@ -77,4 +82,7 @@ public:
 
 	UFUNCTION(Category = "KzUI|Prompt", BlueprintImplementableEvent, meta = (DisplayName = "On Cancel"))
 	void ReceiveOnCancel();
+
+private:
+	bool bAnswered = false;
 };
