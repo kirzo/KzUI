@@ -27,8 +27,11 @@ public class KzUIEditor : ModuleRules
 				"BlueprintGraph",
 				"UnrealEd",
 				"AssetDefinition",
+				"AssetTools",
+				"ContentBrowser",
 				"PropertyEditor",
-				"Projects"
+				"Projects",
+				"ToolMenus"
 			}
 			);
 	}

@@ -12,4 +12,6 @@ public:
 
 private:
 	FDelegateHandle BlueprintPreCompileHandle;
+
+	FDelegateHandle ToolMenusHandle;
 };
