@@ -5,10 +5,12 @@
 #include "KzUIIconTheme.h"
 #include "KzUIInputSettings.h"
 #include "KzUIInputSubsystem.h"
+#include "KzUserWidget.h"
 
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Widgets/Images/SImage.h"
 
 void UKzInputIcon::SetInput(EKzUIInputType NewInput)
 {
@@ -38,6 +40,37 @@ void UKzInputIcon::OnWidgetRebuilt()
 {
 	Super::OnWidgetRebuilt();
 	RefreshIcon();
+
+	// An active timer and not the widget tick, which only runs while a flipbook plays
+	if (bShowHoldProgress && !IsDesignTime() && MyImage.IsValid())
+	{
+		LastHoldProgress = -1.0f;
+		const TWeakObjectPtr<UKzInputIcon> WeakThis(this);
+		MyImage->RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateLambda([WeakThis](double, float)
+			{
+				return WeakThis.IsValid() ? WeakThis->UpdateHoldProgress() : EActiveTimerReturnType::Stop;
+			}
+		));
+	}
+}
+
+EActiveTimerReturnType UKzInputIcon::UpdateHoldProgress()
+{
+	const UKzUserWidget* Owner = GetTypedOuter<UKzUserWidget>();
+	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::GetForWidget(this);
+	const UKzUIIconTheme* Theme = Subsystem ? Subsystem->GetIconTheme() : UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+	if (!Owner || !Theme)
+	{
+		return EActiveTimerReturnType::Continue;
+	}
+
+	const float Progress = Owner->GetInputHoldProgress(Input);
+	if (Progress != LastHoldProgress)
+	{
+		LastHoldProgress = Progress;
+		SetMaterialScalarParameter(Theme->HoldProgressParameter, Progress);
+	}
+	return EActiveTimerReturnType::Continue;
 }
 
 UKzUIInputSubsystem* UKzInputIcon::BindPlayerSubsystem()
@@ -85,8 +118,10 @@ void UKzInputIcon::RefreshIcon()
 		Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
 	}
 
+	// A new material starts from its defaults, so the hold progress is pushed again
+	LastHoldProgress = -1.0f;
 	FallbackText = FText::GetEmpty();
-	UObject* Icon = !Theme ? nullptr : CustomToken.IsNone() ? Theme->GetIcon(Input, Device) : Theme->GetCustomIcon(CustomToken, Device);
+	UObject* Icon =!Theme ? nullptr : CustomToken.IsNone() ? Theme->GetIcon(Input, Device) : Theme->GetCustomIcon(CustomToken, Device);
 	if (!Icon)
 	{
 		// The name of the key that fires the input on this device stands in, for a KzTextBlock to show

@@ -25,6 +25,10 @@ public:
 	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
 	FName Variation;
 
+	/** Feeds the hold progress of Input in the owning KzUserWidget (0 to 1) to the theme's HoldProgressParameter of the icon material every frame, for hold-to-confirm prompts. Needs a material icon or variation. */
+	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
+	bool bShowHoldProgress = false;
+
 #if WITH_EDITORONLY_DATA
 	/** Device used to preview the icon in the designer. */
 	UPROPERTY(Category = Icon, EditAnywhere)
@@ -64,6 +68,11 @@ private:
 
 	UFUNCTION()
 	void OnInputDeviceChanged(EKzUIInputDevice InputDevice);
+
+	EActiveTimerReturnType UpdateHoldProgress();
+
+	/** Last value pushed to the material, so it is only set when it changes. */
+	float LastHoldProgress = -1.0f;
 
 	TWeakObjectPtr<class UKzUIInputSubsystem> BoundSubsystem;
 

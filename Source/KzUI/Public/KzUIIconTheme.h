@@ -56,6 +56,10 @@ public:
 	UPROPERTY(Category = Variations, EditAnywhere)
 	FName VariationTextureParameter = TEXT("Icon");
 
+	/** Scalar parameter of the icon materials that a KzInputIcon with bShowHoldProgress drives with the hold progress. */
+	UPROPERTY(Category = Variations, EditAnywhere)
+	FName HoldProgressParameter = TEXT("Progress");
+
 	UFUNCTION(Category = "KzUI", BlueprintPure)
 	UObject* GetIcon(EKzUIInputType Input, EKzUIInputDevice Device) const
 	{
