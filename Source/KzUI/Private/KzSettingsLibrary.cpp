@@ -1,15 +1,20 @@
 // Copyright 2026 kirzo
 
 #include "KzSettingsLibrary.h"
+#include "KzUIInputSettings.h"
 
 #include "Engine/Engine.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Internationalization/Culture.h"
 #include "Internationalization/Internationalization.h"
 #include "Internationalization/TextLocalizationManager.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetInternationalizationLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Sound/SoundClass.h"
+#include "Sound/SoundMix.h"
+#include "Sound/SoundSubmix.h"
 
 #define LOCTEXT_NAMESPACE "KzUI"
 
@@ -23,13 +28,58 @@ namespace
 	constexpr float MinGamma = 1.5f;
 	constexpr float MaxGamma = 3.0f;
 
-	/** GameUserSettings has no gamma, so it lives in its ini under this section. */
-	const TCHAR* GammaSection = TEXT("/Script/KzUI.KzSettingsLibrary");
+	/** GameUserSettings has no gamma or volumes, so they live in its ini under this section. */
+	const TCHAR* SavedSection = TEXT("/Script/KzUI.KzSettingsLibrary");
 	const TCHAR* GammaKey = TEXT("DisplayGamma");
 
-	/** Language and Gamma take effect right away; these mark them for saving on ApplySettings. */
+	/** Language, Gamma and the volumes take effect right away; these mark them for saving on ApplySettings. */
 	bool bLanguagePending = false;
 	bool bGammaPending = false;
+	TSet<FName> PendingVolumes;
+
+	FString GetVolumeKey(FName Channel)
+	{
+		return TEXT("Volume.") + Channel.ToString();
+	}
+
+	/** Each channel's volume, read the first time from the ini or the channel's default. */
+	float& GetVolumeRef(FName Channel)
+	{
+		static TMap<FName, float> Volumes;
+		if (float* Volume = Volumes.Find(Channel))
+		{
+			return *Volume;
+		}
+
+		const FKzUIVolumeChannel* Config = UKzUIInputSettings::Get()->VolumeChannels.Find(Channel);
+		float Volume = Config ? Config->DefaultVolume : 1.0f;
+		GConfig->GetFloat(SavedSection, *GetVolumeKey(Channel), Volume, GGameUserSettingsIni);
+		return Volumes.Add(Channel, FMath::Clamp(Volume, 0.0f, 1.0f));
+	}
+
+	/** Sends one channel's volume to its target, or to the project's applier without one. Sound Class volumes need VolumeSoundMix pushed. */
+	void SendVolume(const UObject* WorldContextObject, FName Channel, float Volume)
+	{
+		const UKzUIInputSettings* Settings = UKzUIInputSettings::Get();
+		const FKzUIVolumeChannel* Config = Settings->VolumeChannels.Find(Channel);
+		UObject* Target = Config ? Config->Target.LoadSynchronous() : nullptr;
+
+		if (USoundClass* SoundClass = Cast<USoundClass>(Target))
+		{
+			if (USoundMix* Mix = Settings->VolumeSoundMix.LoadSynchronous())
+			{
+				UGameplayStatics::SetSoundMixClassOverride(WorldContextObject, Mix, SoundClass, Volume, 1.0f, 0.0f, true);
+			}
+		}
+		else if (USoundSubmix* Submix = Cast<USoundSubmix>(Target))
+		{
+			Submix->SetSubmixOutputVolume(WorldContextObject, Volume);
+		}
+		else if (UClass* ApplierClass = Settings->VolumeApplier.LoadSynchronous())
+		{
+			ApplierClass->GetDefaultObject<UKzUIVolumeApplier>()->ApplyVolume(WorldContextObject, Channel, Volume);
+		}
+	}
 }
 
 /** Cultures with game localization as GetSettingOptions last listed them, so indices match the options a spinner shows. */
@@ -301,9 +351,14 @@ void UKzSettingsLibrary::ApplySettings()
 	}
 	if (bGammaPending && GEngine && GConfig)
 	{
-		GConfig->SetFloat(GammaSection, GammaKey, GEngine->DisplayGamma, GGameUserSettingsIni);
+		GConfig->SetFloat(SavedSection, GammaKey, GEngine->DisplayGamma, GGameUserSettingsIni);
 		bGammaPending = false;
 	}
+	for (const FName Channel : PendingVolumes)
+	{
+		GConfig->SetFloat(SavedSection, *GetVolumeKey(Channel), GetVolumeRef(Channel), GGameUserSettingsIni);
+	}
+	PendingVolumes.Reset();
 	UGameUserSettings::GetGameUserSettings()->ApplySettings(false);
 }
 
@@ -326,9 +381,43 @@ void UKzSettingsLibrary::AutoDetectQuality(bool bApply)
 void UKzSettingsLibrary::ApplySavedGamma()
 {
 	float Gamma = 0.0f;
-	if (GEngine && GConfig && GConfig->GetFloat(GammaSection, GammaKey, Gamma, GGameUserSettingsIni))
+	if (GEngine && GConfig && GConfig->GetFloat(SavedSection, GammaKey, Gamma, GGameUserSettingsIni))
 	{
 		GEngine->DisplayGamma = FMath::Clamp(Gamma, MinGamma, MaxGamma);
+	}
+}
+
+float UKzSettingsLibrary::GetVolume(FName Channel)
+{
+	return GetVolumeRef(Channel);
+}
+
+void UKzSettingsLibrary::SetVolume(const UObject* WorldContextObject, FName Channel, float Volume, bool bApply)
+{
+	if (!UKzUIInputSettings::Get()->VolumeChannels.Contains(Channel))
+	{
+		return;
+	}
+
+	Volume = FMath::Clamp(Volume, 0.0f, 1.0f);
+	GetVolumeRef(Channel) = Volume;
+	PendingVolumes.Add(Channel);
+	SendVolume(WorldContextObject, Channel, Volume);
+	NotifyChanged(bApply);
+}
+
+void UKzSettingsLibrary::ApplyVolumes(const UObject* WorldContextObject)
+{
+	const UKzUIInputSettings* Settings = UKzUIInputSettings::Get();
+	for (const TPair<FName, FKzUIVolumeChannel>& Pair : Settings->VolumeChannels)
+	{
+		SendVolume(WorldContextObject, Pair.Key, GetVolumeRef(Pair.Key));
+	}
+
+	// The class overrides are in place before the mix becomes active, so nothing plays at full volume first
+	if (USoundMix* Mix = Settings->VolumeSoundMix.LoadSynchronous())
+	{
+		UGameplayStatics::PushSoundMixModifier(WorldContextObject, Mix);
 	}
 }
 

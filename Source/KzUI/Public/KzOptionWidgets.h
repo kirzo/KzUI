@@ -229,9 +229,13 @@ public:
 	UPROPERTY(Category = "KzUI|Slider", EditAnywhere, meta = (ClampMin = 0.01, ClampMax = 1))
 	float Step = 0.1f;
 
-	/** Value-shaped engine setting to auto-populate from and apply to (ResolutionScale, Gamma). */
+	/** Value-shaped engine setting to auto-populate from and apply to (ResolutionScale, Gamma, Volume). */
 	UPROPERTY(Category = "KzUI|Slider", EditAnywhere)
 	EKzUIStandardSetting Setting = EKzUIStandardSetting::None;
+
+	/** Volume channel of the KzUI project settings this row drives. */
+	UPROPERTY(Category = "KzUI|Slider", EditAnywhere, meta = (GetOptions = "GetVolumeChannelNames", EditCondition = "Setting == EKzUIStandardSetting::Volume", EditConditionHides))
+	FName VolumeChannel;
 
 	UPROPERTY(Category = "KzUI|Events", BlueprintAssignable)
 	FKzSliderValueChangedSignature OnValueChanged;
@@ -275,6 +279,12 @@ public:
 
 private:
 	void RefreshValueVisuals();
+
+	/** The bound setting's value: a volume channel's for Volume. */
+	float ReadSetting() const;
+
+	UFUNCTION()
+	TArray<FName> GetVolumeChannelNames() const;
 
 	/** Sets the value from the cursor's position along the Bar. */
 	void DragTo(const FPointerEvent& MouseEvent);

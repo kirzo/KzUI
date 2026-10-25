@@ -4,6 +4,7 @@
 
 #include "Logging/MessageLog.h"
 #include "Misc/DataValidation.h"
+#include "Sound/SoundClass.h"
 
 #define LOCTEXT_NAMESPACE "KzUI"
 
@@ -198,6 +199,20 @@ EDataValidationResult UKzUIInputSettings::IsDataValid(FDataValidationContext& Co
 				const FText Device = Key.IsGamepadKey() ? UEnum::GetDisplayValueAsText(Family) : UEnum::GetDisplayValueAsText(EKzUIInputDevice::Keyboard);
 				Report(FText::Format(LOCTEXT("KeyInTwoInputs", "{0} is mapped to both {1} and {2} on {3}: only one of them gets it."), Key.GetDisplayName(), UEnum::GetDisplayValueAsText(*Owner), UEnum::GetDisplayValueAsText(Input), Device));
 			}
+		}
+	}
+
+	// A channel with nowhere to go still saves its value, but the player hears no change
+	for (const TPair<FName, FKzUIVolumeChannel>& Pair : VolumeChannels)
+	{
+		const UObject* Target = Pair.Value.Target.LoadSynchronous();
+		if (Target && Target->IsA<USoundClass>() && VolumeSoundMix.IsNull())
+		{
+			Context.AddWarning(FText::Format(LOCTEXT("VolumeWithoutMix", "Volume channel {0} targets a Sound Class, which needs a Volume Sound Mix to carry its volume."), FText::FromName(Pair.Key)));
+		}
+		else if (Pair.Value.Target.IsNull() && VolumeApplier.IsNull())
+		{
+			Context.AddWarning(FText::Format(LOCTEXT("VolumeWithoutTarget", "Volume channel {0} has no Target and there is no Volume Applier: its value is saved but changes nothing."), FText::FromName(Pair.Key)));
 		}
 	}
 	return Result;

@@ -8,8 +8,9 @@
 
 /**
  * Engine settings the option widgets can bind to directly. Resolution, WindowMode, Quality, FrameRateLimit and Language are
- * index-shaped (spinner), VSync and HDR are bool-shaped (toggle, or a two-option spinner), ResolutionScale and Gamma are
- * value-shaped (slider). Language and Gamma take effect as they change and are saved by ApplySettings, with the rest.
+ * index-shaped (spinner), VSync and HDR are bool-shaped (toggle, or a two-option spinner), ResolutionScale, Gamma and Volume are
+ * value-shaped (slider; Volume needs the slider's channel, see GetVolume). Language, Gamma and Volume take effect as they change
+ * and are saved by ApplySettings, with the rest.
  */
 UENUM(BlueprintType)
 enum class EKzUIStandardSetting : uint8
@@ -23,7 +24,8 @@ enum class EKzUIStandardSetting : uint8
 	FrameRateLimit,
 	HDR,
 	Language,
-	Gamma
+	Gamma,
+	Volume
 };
 
 /** Scalability group a Quality setting drives. */
@@ -48,6 +50,18 @@ struct FKzUISettingState
 {
 	FIntPoint Resolution = FIntPoint::ZeroValue;
 	Scalability::FQualityLevels Quality;
+};
+
+/** Applies volume channels that have no Sound Class or Submix target: Control Buses, Wwise, FMOD. Subclass it in C++ or Blueprint and pick it as VolumeApplier in the KzUI project settings; it runs on the class default object. */
+UCLASS(Abstract, Blueprintable)
+class KZUI_API UKzUIVolumeApplier : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(Category = "KzUI|Audio", BlueprintNativeEvent)
+	void ApplyVolume(const UObject* WorldContextObject, FName Channel, float Volume);
+	virtual void ApplyVolume_Implementation(const UObject* WorldContextObject, FName Channel, float Volume) {}
 };
 
 /** Stateless wrappers over UGameUserSettings, shaped for the KzUI option widgets. */
@@ -95,6 +109,18 @@ public:
 
 	/** Restores the Gamma a previous session saved. Called by the module once the engine is up, outside the editor. */
 	static void ApplySavedGamma();
+
+	/** Volume of a channel of the KzUI project settings, 0 to 1: the saved one, or its default. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintPure)
+	static float GetVolume(FName Channel);
+
+	/** Sets a channel's volume, heard right away; ApplySettings saves it with the rest. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable, meta = (WorldContext = "WorldContextObject"))
+	static void SetVolume(const UObject* WorldContextObject, FName Channel, float Volume, bool bApply = true);
+
+	/** Applies every channel's volume and pushes VolumeSoundMix. The module calls it whenever a game instance starts, after its first world loads. */
+	UFUNCTION(Category = "KzUI|Settings", BlueprintCallable, meta = (WorldContext = "WorldContextObject"))
+	static void ApplyVolumes(const UObject* WorldContextObject);
 
 	/** Whether the resolution or window mode in use is not the last one the player confirmed. */
 	UFUNCTION(Category = "KzUI|Settings", BlueprintPure)

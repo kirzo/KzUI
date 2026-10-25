@@ -10,6 +10,22 @@
 class UKzPromptWidget;
 class UKzUISoundTheme;
 class UKzUIIconTheme;
+class UKzUIVolumeApplier;
+class USoundMix;
+
+/** One volume the player can set (Music, Effects...), saved per machine and applied to its Target. */
+USTRUCT(BlueprintType)
+struct KZUI_API FKzUIVolumeChannel
+{
+	GENERATED_BODY()
+
+	/** Sound Class (through VolumeSoundMix) or Sound Submix the volume goes to. Without one, the project's VolumeApplier applies it (Control Buses, Wwise, FMOD). */
+	UPROPERTY(Category = Audio, EditAnywhere, meta = (AllowedClasses = "/Script/Engine.SoundClass,/Script/Engine.SoundSubmix"))
+	TSoftObjectPtr<UObject> Target;
+
+	UPROPERTY(Category = Audio, EditAnywhere, meta = (ClampMin = 0, ClampMax = 1))
+	float DefaultVolume = 1.0f;
+};
 
 /**
  * Project-wide key mapping for semantic UI inputs. Available under
@@ -37,7 +53,7 @@ public:
 	/** Also reports the IsDataValid issues to the Asset Check log, since nothing validates project settings on save. */
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
-	/** Warns about inputs without keys and keys mapped to two inputs on the same device, per pad family. */
+	/** Warns about inputs without keys and keys mapped to two inputs on the same device, per pad family, and about volume channels that cannot be heard. */
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 
@@ -66,6 +82,18 @@ public:
 	/** Prompt widget spawned by UKzUserWidget::ShowPrompt. Same rename caveat as SoundTheme. */
 	UPROPERTY(Category = Prompt, EditAnywhere, Config)
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
+
+	/** Volumes the player can set, by the name settings rows and UKzSettingsLibrary::SetVolume use. Applied when each game instance starts, after its first world loads. */
+	UPROPERTY(Category = Audio, EditAnywhere, Config, meta = (ForceInlineRow))
+	TMap<FName, FKzUIVolumeChannel> VolumeChannels;
+
+	/** Sound Mix that carries the volumes of the channels targeting a Sound Class, pushed when the game instance starts. */
+	UPROPERTY(Category = Audio, EditAnywhere, Config)
+	TSoftObjectPtr<USoundMix> VolumeSoundMix;
+
+	/** Applies the channels without a Target, for audio a Sound Class or Submix cannot reach. */
+	UPROPERTY(Category = Audio, EditAnywhere, Config)
+	TSoftClassPtr<UKzUIVolumeApplier> VolumeApplier;
 
 private:
 	void AddMissingInputs();

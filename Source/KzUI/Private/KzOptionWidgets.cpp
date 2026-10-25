@@ -358,7 +358,7 @@ void UKzSlider::Resync_Implementation()
 {
 	if (Setting != EKzUIStandardSetting::None)
 	{
-		Value = UKzSettingsLibrary::GetSettingValue(Setting);
+		Value = ReadSetting();
 		RefreshValueVisuals();
 	}
 	InitialValue = Value;
@@ -368,9 +368,21 @@ void UKzSlider::ShowCurrentSetting()
 {
 	if (Setting != EKzUIStandardSetting::None)
 	{
-		Value = UKzSettingsLibrary::GetSettingValue(Setting);
+		Value = ReadSetting();
 		RefreshValueVisuals();
 	}
+}
+
+float UKzSlider::ReadSetting() const
+{
+	return Setting == EKzUIStandardSetting::Volume ? UKzSettingsLibrary::GetVolume(VolumeChannel) : UKzSettingsLibrary::GetSettingValue(Setting);
+}
+
+TArray<FName> UKzSlider::GetVolumeChannelNames() const
+{
+	TArray<FName> Names;
+	UKzUIInputSettings::Get()->VolumeChannels.GetKeys(Names);
+	return Names;
 }
 
 bool UKzSlider::WantsInput_Implementation(EKzUIInputType Input) const
@@ -458,7 +470,12 @@ void UKzSlider::SetValue(float NewValue)
 	Value = NewValue;
 	RefreshValueVisuals();
 
-	if (Setting != EKzUIStandardSetting::None)
+	if (Setting == EKzUIStandardSetting::Volume)
+	{
+		UKzSettingsLibrary::SetVolume(this, VolumeChannel, Value, false);
+		ScheduleApply();
+	}
+	else if (Setting != EKzUIStandardSetting::None)
 	{
 		UKzSettingsLibrary::SetSettingValue(Setting, Value, false);
 		ScheduleApply();
