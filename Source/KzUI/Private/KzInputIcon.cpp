@@ -120,24 +120,25 @@ FKzUIIconContext UKzInputIcon::MakeContext()
 		Context.Device = PreviewDevice;
 		Context.GamepadDevice = PreviewDevice != EKzUIInputDevice::Keyboard ? PreviewDevice : Context.GamepadDevice;
 		Context.Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
-		return Context;
 	}
+	else
 #endif
-
 	if (const UKzUIInputSubsystem* Subsystem = BindPlayerSubsystem())
 	{
 		Context.Player = Subsystem->GetLocalPlayer();
 		Context.Device = Subsystem->GetCurrentInputDevice();
 		Context.GamepadDevice = Subsystem->GetGamepadDevice();
 		Context.Theme = Subsystem->GetIconTheme();
-		if (Context.Device == EKzUIInputDevice::Keyboard && UKzUIInputSettings::Get()->bGamepadIconsOnKeyboard)
-		{
-			Context.Device = Context.GamepadDevice;
-		}
 	}
 	else
 	{
 		Context.Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+	}
+
+	// Also in the designer, so the Keyboard preview shows what the game will
+	if (Context.Device == EKzUIInputDevice::Keyboard && UKzUIInputSettings::Get()->bGamepadIconsOnKeyboard)
+	{
+		Context.Device = Context.GamepadDevice;
 	}
 	return Context;
 }
