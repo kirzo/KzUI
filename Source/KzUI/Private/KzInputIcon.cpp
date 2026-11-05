@@ -130,6 +130,10 @@ FKzUIIconContext UKzInputIcon::MakeContext()
 		Context.Device = Subsystem->GetCurrentInputDevice();
 		Context.GamepadDevice = Subsystem->GetGamepadDevice();
 		Context.Theme = Subsystem->GetIconTheme();
+		if (Context.Device == EKzUIInputDevice::Keyboard && UKzUIInputSettings::Get()->bGamepadIconsOnKeyboard)
+		{
+			Context.Device = Context.GamepadDevice;
+		}
 	}
 	else
 	{

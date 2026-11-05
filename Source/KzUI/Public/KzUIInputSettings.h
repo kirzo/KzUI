@@ -79,6 +79,10 @@ public:
 	UPROPERTY(Category = Icons, EditAnywhere, Config)
 	TSoftObjectPtr<UKzUIIconTheme> IconTheme;
 
+	/** For games whose prompts are drawn for a pad: a player on the keyboard sees the icons of their last pad, or of the platform's own before they use one. Only the icons change; the keyboard keeps working. */
+	UPROPERTY(Category = Icons, EditAnywhere, Config)
+	bool bGamepadIconsOnKeyboard = false;
+
 	/** Prompt widget spawned by UKzUserWidget::ShowPrompt. Same rename caveat as SoundTheme. */
 	UPROPERTY(Category = Prompt, EditAnywhere, Config)
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
