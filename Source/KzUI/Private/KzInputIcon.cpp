@@ -124,18 +124,22 @@ void UKzInputIcon::RefreshIcon()
 	UObject* Icon =!Theme ? nullptr : CustomToken.IsNone() ? Theme->GetIcon(Input, Device) : Theme->GetCustomIcon(CustomToken, Device);
 	if (!Icon)
 	{
-		// The name of the key that fires the input on this device stands in, for a KzTextBlock to show
+		// The key that fires the input on this device stands in: its icon, or its name for a KzTextBlock to show
 		const FKzUIInputDefinition* Definition = CustomToken.IsNone() ? UKzUIInputSettings::Get()->FindInputDefinition(Input, GamepadDevice) : nullptr;
 		for (const FKey& Key : Definition ? Definition->GetKeys() : TArray<FKey>())
 		{
 			if (Key.IsGamepadKey() == (Device != EKzUIInputDevice::Keyboard))
 			{
-				FallbackText = Key.GetDisplayName();
+				Icon = Theme ? Theme->GetKeyIcon(Key, Device) : nullptr;
+				FallbackText = Icon ? FText::GetEmpty() : Key.GetDisplayName();
 				break;
 			}
 		}
-		ClearIcon();
-		return;
+		if (!Icon)
+		{
+			ClearIcon();
+			return;
+		}
 	}
 
 	// A material has no size of its own, and a variation wraps a texture that does

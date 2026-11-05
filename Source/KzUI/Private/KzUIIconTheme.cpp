@@ -1,6 +1,7 @@
 // Copyright 2026 kirzo
 
 #include "KzUIIconTheme.h"
+#include "KzUIInputSettings.h"
 #include "Misc/DataValidation.h"
 
 #define LOCTEXT_NAMESPACE "KzUI"
@@ -14,9 +15,24 @@ EDataValidationResult UKzUIIconTheme::IsDataValid(FDataValidationContext& Contex
 	for (EKzUIInputType Input : TEnumRange<EKzUIInputType>())
 	{
 		const FKzUIIcon* Icon = InputIcons.Find(Input);
-		if (!Icon || !Icon->Default)
+		if (Icon && Icon->Default)
 		{
-			Context.AddWarning(FText::Format(LOCTEXT("ThemeMissingIcon", "{0} has no default icon: devices without their own override show none."), UEnum::GetDisplayValueAsText(Input)));
+			continue;
+		}
+
+		const FKzUIInputDefinition* Definition = UKzUIInputSettings::Get()->FindInputDefinition(Input, EKzUIInputDevice::Xbox);
+		const TArray<FKey> Keys = Definition ? Definition->GetKeys() : TArray<FKey>();
+		if (!Keys.ContainsByPredicate([this](const FKey& Key) { return KeyIcons.Contains(Key); }))
+		{
+			Context.AddWarning(FText::Format(LOCTEXT("ThemeMissingIcon", "{0} has no default icon and none of its keys has one: devices without their own override show the key name."), UEnum::GetDisplayValueAsText(Input)));
+		}
+	}
+
+	for (const TPair<FKey, FKzUIIcon>& Pair : KeyIcons)
+	{
+		if (!Pair.Key.IsValid())
+		{
+			Context.AddWarning(FText::Format(LOCTEXT("ThemeInvalidKey", "Key icon '{0}' is not a valid key: nothing ever shows it."), FText::FromName(Pair.Key.GetFName())));
 		}
 	}
 

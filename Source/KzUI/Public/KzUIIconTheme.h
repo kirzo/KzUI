@@ -41,8 +41,13 @@ class KZUI_API UKzUIIconTheme : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	/** Icons of the UI inputs. An input without one here shows the icon of its key. */
 	UPROPERTY(Category = Icons, EditAnywhere)
 	TMap<EKzUIInputType, FKzUIIcon> InputIcons;
+
+	/** Icons of physical keys, shown for UI inputs without their own icon and for the keys behind Enhanced Input actions. A key without one shows its name. */
+	UPROPERTY(Category = Icons, EditAnywhere)
+	TMap<FKey, FKzUIIcon> KeyIcons;
 
 	/** Project-defined icons, resolvable in a KzTextBlock as {TokenName}. Names must not contain ':', reserved for the {Token:Variation} syntax. */
 	UPROPERTY(Category = Icons, EditAnywhere)
@@ -68,6 +73,13 @@ public:
 	}
 
 	UFUNCTION(Category = "KzUI", BlueprintPure)
+	UObject* GetKeyIcon(FKey Key, EKzUIInputDevice Device) const
+	{
+		const FKzUIIcon* Icon = KeyIcons.Find(Key);
+		return Icon ? Icon->Resolve(Device) : nullptr;
+	}
+
+	UFUNCTION(Category = "KzUI", BlueprintPure)
 	UObject* GetCustomIcon(FName Token, EKzUIInputDevice Device) const
 	{
 		const FKzUIIcon* Icon = CustomIcons.Find(Token);
@@ -80,7 +92,7 @@ public:
 	UMaterialInterface* GetVariation(FName Variation) const { return IconVariations.FindRef(Variation); }
 
 #if WITH_EDITOR
-	/** Warns about inputs without a default icon and rejects custom icon names with ':'. */
+	/** Warns about inputs without an icon of their own or of their keys and about invalid keys, and rejects custom icon names with ':'. */
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 };

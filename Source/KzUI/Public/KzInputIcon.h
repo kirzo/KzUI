@@ -47,7 +47,7 @@ public:
 	/** Size of the icon shown, for its aspect ratio: the texture or flipbook frame size, square for a material, zero when nothing is shown. */
 	FVector2D GetNaturalSize() const { return NaturalSize; }
 
-	/** While the theme has no icon for the input on this device, the display name of the key that fires it there ("Space", "E"). Empty for custom tokens. */
+	/** While the theme has no icon for the input or its key on this device, the display name of that key ("Space", "E"). Empty for custom tokens. */
 	FText GetFallbackText() const { return FallbackText; }
 
 	//~ Begin UWidget Interface
