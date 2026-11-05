@@ -4,6 +4,7 @@
 
 #include "Components/TextBlock.h"
 #include "KzSelectableWidgetInterface.h"
+#include "KzUIIconSource.h"
 #include "KzUITypes.h"
 #include "KzTextBlock.generated.h"
 
@@ -17,9 +18,10 @@ class UKzUIIconTheme;
 class UKzUIInputSubsystem;
 
 /**
- * TextBlock with inline input icons: tokens like {Start} or {Accept} in the text are replaced
- * by a KzInputIcon, so prompts follow the active icon theme and input device. Unknown tokens
- * render as literal text. Property bindings on Text are not supported.
+ * TextBlock with inline input icons: tokens in the text ({Accept}, a custom icon of the theme, a key
+ * like {SpaceBar}, or anything an icon source type takes) are replaced by a KzInputIcon, so prompts
+ * follow the active icon theme and input device. Unknown tokens render as literal text. Property
+ * bindings on Text are not supported.
  *
  * When a style set is assigned, it drives the inherited text appearance properties per widget
  * state (normal/hovered/selected/disabled); states arrive through IKzSelectableWidgetInterface.
@@ -157,7 +159,7 @@ private:
 
 	/** STextBlock with this widget's live font, colour and shadow. */
 	TSharedRef<STextBlock> MakeTextWidget(const TAttribute<FText>& InText);
-	void AddIcon(EKzUIInputType Input, FName CustomToken, FName Variation, int32 SpacesBefore, int32 SpacesAfter);
+	void AddIcon(TInstancedStruct<FKzUIIconSource> IconSource, FName Variation, int32 SpacesBefore, int32 SpacesAfter);
 	const UKzUIIconTheme* GetActiveIconTheme() const;
 
 	/** Height of a line in the current font, which the icons follow. */

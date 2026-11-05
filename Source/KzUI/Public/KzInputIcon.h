@@ -3,29 +3,28 @@
 #pragma once
 
 #include "KzImage.h"
+#include "KzUIIconSource.h"
 #include "KzUITypes.h"
 #include "KzInputIcon.generated.h"
 
-/** Displays the button prompt icon of a semantic input, resolved from the active icon theme and refreshed automatically when the input device changes. */
+/** Displays an input icon of the active icon theme, for whatever its source names (a UI input, a key, a custom icon...), refreshed automatically when the input device changes. */
 UCLASS(meta = (PrioritizeCategories = "Icon Image"))
 class KZUI_API UKzInputIcon : public UKzImage
 {
 	GENERATED_BODY()
 
 public:
-	/** Input whose icon is displayed. */
-	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
-	EKzUIInputType Input = EKzUIInputType::Accept;
+	UKzInputIcon(const FObjectInitializer& ObjectInitializer);
 
-	/** When set, displays this custom icon of the theme instead of the Input one. */
-	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
-	FName CustomToken;
+	/** What the icon shows. */
+	UPROPERTY(Category = Icon, EditAnywhere, meta = (ExcludeBaseStruct))
+	TInstancedStruct<FKzUIIconSource> Source;
 
 	/** Icon variation of the theme wrapping the resolved icon texture in a material. */
 	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
 	FName Variation;
 
-	/** Feeds the hold progress of Input in the owning KzUserWidget (0 to 1) to the theme's HoldProgressParameter of the icon material every frame, for hold-to-confirm prompts. Needs a material icon or variation. */
+	/** Feeds the source's hold progress (0 to 1) to the theme's HoldProgressParameter of the icon material every frame, for hold-to-confirm prompts; a UI Input source gives its input's in the owning KzUserWidget. Needs a material icon or variation. */
 	UPROPERTY(Category = Icon, EditAnywhere, BlueprintReadOnly)
 	bool bShowHoldProgress = false;
 
@@ -35,9 +34,18 @@ public:
 	EKzUIInputDevice PreviewDevice = EKzUIInputDevice::Keyboard;
 #endif
 
+	/** Shows whatever NewSource names. */
+	void SetSource(TInstancedStruct<FKzUIIconSource> NewSource);
+
+	/** The source as T, or null when it is another kind. */
+	template<typename T>
+	const T* GetSource() const { return Source.GetPtr<T>(); }
+
+	/** Shows a UI input. */
 	UFUNCTION(Category = "KzUI|Icon", BlueprintCallable)
 	void SetInput(EKzUIInputType NewInput);
 
+	/** Shows a custom icon of the theme. */
 	UFUNCTION(Category = "KzUI|Icon", BlueprintCallable)
 	void SetCustomToken(FName NewToken);
 
@@ -47,7 +55,7 @@ public:
 	/** Size of the icon shown, for its aspect ratio: the texture or flipbook frame size, square for a material, zero when nothing is shown. */
 	FVector2D GetNaturalSize() const { return NaturalSize; }
 
-	/** While the theme has no icon for the input or its key on this device, the display name of that key ("Space", "E"). Empty for custom tokens. */
+	/** While the theme has no icon for what the source names on this device, the display name of its key ("Space", "E") or the source's own text. */
 	FText GetFallbackText() const { return FallbackText; }
 
 	//~ Begin UWidget Interface
@@ -58,6 +66,9 @@ protected:
 	//~ End UWidget Interface
 
 private:
+	/** The player, device and theme the source resolves in. */
+	FKzUIIconContext MakeContext();
+
 	void RefreshIcon();
 
 	/** Subscribes to the device changes of the player's subsystem, moving the subscription if the player changed. */

@@ -22,18 +22,6 @@
 // Wrap width used to render as a single line: larger than any real allotment
 static constexpr float KzNoWrapSize = 100000.0f;
 
-static bool ParseInputToken(const FString& Token, EKzUIInputType& OutInput)
-{
-	const UEnum* Enum = StaticEnum<EKzUIInputType>();
-	const int64 Value = Enum->GetValueByNameString(Token);
-	if (Value <= (int64)EKzUIInputType::None || Value >= (int64)EKzUIInputType::MAX)
-	{
-		return false;
-	}
-	OutInput = (EKzUIInputType)Value;
-	return true;
-}
-
 void UKzTextBlock::SetStyle(TSubclassOf<UKzTextBlockStyle> NewStyle)
 {
 	Style = NewStyle;
@@ -222,7 +210,8 @@ UKzInputIcon* UKzTextBlock::GetIcon(EKzUIInputType Input) const
 {
 	for (UKzInputIcon* Icon : GeneratedIcons)
 	{
-		if (Icon && Icon->CustomToken.IsNone() && Icon->Input == Input)
+		const FKzUIIconSource_Input* Source = Icon ? Icon->GetSource<FKzUIIconSource_Input>() : nullptr;
+		if (Source && Source->Input == Input)
 		{
 			return Icon;
 		}
@@ -234,7 +223,8 @@ UKzInputIcon* UKzTextBlock::GetCustomIcon(FName Token) const
 {
 	for (UKzInputIcon* Icon : GeneratedIcons)
 	{
-		if (Icon && Icon->CustomToken == Token)
+		const FKzUIIconSource_Custom* Source = Icon ? Icon->GetSource<FKzUIIconSource_Custom>() : nullptr;
+		if (Source && Source->Token == Token)
 		{
 			return Icon;
 		}
@@ -385,13 +375,8 @@ void UKzTextBlock::RebuildContent()
 					Variation = FName(*VariationPart);
 				}
 
-				EKzUIInputType Input = EKzUIInputType::None;
-				FName CustomToken = NAME_None;
-				if (!ParseInputToken(Token, Input) && Theme && Theme->HasCustomIcon(FName(*Token)))
-				{
-					CustomToken = FName(*Token);
-				}
-				if (Input != EKzUIInputType::None || !CustomToken.IsNone())
+				TInstancedStruct<FKzUIIconSource> IconSource = FKzUIIconSource::MakeFromToken(Token, Theme);
+				if (IconSource.IsValid())
 				{
 					// Spaces touching the icon on the side no word absorbs become slot padding,
 					// so they travel with the icon instead of wrapping as standalone widgets
@@ -416,7 +401,7 @@ void UKzTextBlock::RebuildContent()
 							++SpacesAfter;
 						}
 					}
-					AddIcon(Input, CustomToken, Variation, SpacesBefore, SpacesAfter);
+					AddIcon(MoveTemp(IconSource), Variation, SpacesBefore, SpacesAfter);
 					i = Next - 1;
 					continue;
 				}
@@ -523,7 +508,7 @@ TSharedRef<STextBlock> UKzTextBlock::MakeTextWidget(const TAttribute<FText>& InT
 		.TransformPolicy(GetTextTransformPolicy());
 }
 
-void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variation, int32 SpacesBefore, int32 SpacesAfter)
+void UKzTextBlock::AddIcon(TInstancedStruct<FKzUIIconSource> IconSource, FName Variation, int32 SpacesBefore, int32 SpacesAfter)
 {
 	// The outer must be the WidgetTree: UWidget resolves its owning player through its direct outer
 	UKzInputIcon* Icon = NewObject<UKzInputIcon>(GetOuter());
@@ -533,9 +518,8 @@ void UKzTextBlock::AddIcon(EKzUIInputType Input, FName CustomToken, FName Variat
 	Icon->SetDesignerFlags(GetDesignerFlags());
 	Icon->PreviewDevice = PreviewDevice;
 #endif
-	Icon->CustomToken = CustomToken;
 	Icon->Variation = Variation;
-	Icon->SetInput(Input);
+	Icon->SetSource(MoveTemp(IconSource));
 	GeneratedIcons.Add(Icon);
 
 	const TWeakObjectPtr<UKzTextBlock> WeakThis(this);

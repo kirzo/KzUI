@@ -5,23 +5,37 @@
 #include "KzUIIconTheme.h"
 #include "KzUIInputSettings.h"
 #include "KzUIInputSubsystem.h"
-#include "KzUserWidget.h"
 
+#include "Engine/LocalPlayer.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Widgets/Images/SImage.h"
 
+UKzInputIcon::UKzInputIcon(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	Source.InitializeAs<FKzUIIconSource_Input>();
+}
+
+void UKzInputIcon::SetSource(TInstancedStruct<FKzUIIconSource> NewSource)
+{
+	Source = MoveTemp(NewSource);
+	RefreshIcon();
+}
+
 void UKzInputIcon::SetInput(EKzUIInputType NewInput)
 {
-	Input = NewInput;
-	RefreshIcon();
+	FKzUIIconSource_Input NewSource;
+	NewSource.Input = NewInput;
+	SetSource(TInstancedStruct<FKzUIIconSource>::Make<FKzUIIconSource_Input>(NewSource));
 }
 
 void UKzInputIcon::SetCustomToken(FName NewToken)
 {
-	CustomToken = NewToken;
-	RefreshIcon();
+	FKzUIIconSource_Custom NewSource;
+	NewSource.Token = NewToken;
+	SetSource(TInstancedStruct<FKzUIIconSource>::Make<FKzUIIconSource_Custom>(NewSource));
 }
 
 void UKzInputIcon::SetVariation(FName NewVariation)
@@ -56,19 +70,18 @@ void UKzInputIcon::OnWidgetRebuilt()
 
 EActiveTimerReturnType UKzInputIcon::UpdateHoldProgress()
 {
-	const UKzUserWidget* Owner = GetTypedOuter<UKzUserWidget>();
-	const UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::GetForWidget(this);
-	const UKzUIIconTheme* Theme = Subsystem ? Subsystem->GetIconTheme() : UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
-	if (!Owner || !Theme)
+	const FKzUIIconContext Context = MakeContext();
+	const FKzUIIconSource* IconSource = Source.GetPtr();
+	if (!IconSource || !Context.Theme)
 	{
 		return EActiveTimerReturnType::Continue;
 	}
 
-	const float Progress = Owner->GetInputHoldProgress(Input);
+	const float Progress = IconSource->GetHoldProgress(Context);
 	if (Progress != LastHoldProgress)
 	{
 		LastHoldProgress = Progress;
-		SetMaterialScalarParameter(Theme->HoldProgressParameter, Progress);
+		SetMaterialScalarParameter(Context.Theme->HoldProgressParameter, Progress);
 	}
 	return EActiveTimerReturnType::Continue;
 }
@@ -91,55 +104,59 @@ UKzUIInputSubsystem* UKzInputIcon::BindPlayerSubsystem()
 	return Subsystem;
 }
 
-void UKzInputIcon::RefreshIcon()
+FKzUIIconContext UKzInputIcon::MakeContext()
 {
 	// Without a player, the project theme and the platform's own pad, which is where a new player starts
-	EKzUIInputDevice Device = UKzUIInputSubsystem::GetPlatformGamepadDevice();
-	EKzUIInputDevice GamepadDevice = Device;
-	const UKzUIIconTheme* Theme = nullptr;
+	FKzUIIconContext Context;
+	Context.Icon = this;
+	Context.Device = UKzUIInputSubsystem::GetPlatformGamepadDevice();
+	Context.GamepadDevice = Context.Device;
 
 #if WITH_EDITOR
 	if (IsDesignTime())
 	{
-		Device = PreviewDevice;
-		GamepadDevice = PreviewDevice != EKzUIInputDevice::Keyboard ? PreviewDevice : GamepadDevice;
-		Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+		Context.Device = PreviewDevice;
+		Context.GamepadDevice = PreviewDevice != EKzUIInputDevice::Keyboard ? PreviewDevice : Context.GamepadDevice;
+		Context.Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+		return Context;
 	}
-	else
 #endif
+
 	if (const UKzUIInputSubsystem* Subsystem = BindPlayerSubsystem())
 	{
-		Device = Subsystem->GetCurrentInputDevice();
-		GamepadDevice = Subsystem->GetGamepadDevice();
-		Theme = Subsystem->GetIconTheme();
+		Context.Player = Subsystem->GetLocalPlayer();
+		Context.Device = Subsystem->GetCurrentInputDevice();
+		Context.GamepadDevice = Subsystem->GetGamepadDevice();
+		Context.Theme = Subsystem->GetIconTheme();
 	}
 	else
 	{
-		Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+		Context.Theme = UKzUIInputSettings::Get()->IconTheme.LoadSynchronous();
+	}
+	return Context;
+}
+
+void UKzInputIcon::RefreshIcon()
+{
+	const FKzUIIconContext Context = MakeContext();
+	const FKzUIIconSource* IconSource = Source.GetPtr();
+	const FKzUIIconResolution Resolution = IconSource ? IconSource->Resolve(Context) : FKzUIIconResolution();
+
+	UObject* Icon = Resolution.Icon;
+	if (!Icon && Resolution.Key.IsValid() && Context.Theme)
+	{
+		Icon = Context.Theme->GetKeyIcon(Resolution.Key, Context.Device);
 	}
 
 	// A new material starts from its defaults, so the hold progress is pushed again
 	LastHoldProgress = -1.0f;
-	FallbackText = FText::GetEmpty();
-	UObject* Icon =!Theme ? nullptr : CustomToken.IsNone() ? Theme->GetIcon(Input, Device) : Theme->GetCustomIcon(CustomToken, Device);
+
+	// A key without an icon shows its name, for a KzTextBlock to display
+	FallbackText = Icon ? FText::GetEmpty() : Resolution.Key.IsValid() ? Resolution.Key.GetDisplayName() : Resolution.Text;
 	if (!Icon)
 	{
-		// The key that fires the input on this device stands in: its icon, or its name for a KzTextBlock to show
-		const FKzUIInputDefinition* Definition = CustomToken.IsNone() ? UKzUIInputSettings::Get()->FindInputDefinition(Input, GamepadDevice) : nullptr;
-		for (const FKey& Key : Definition ? Definition->GetKeys() : TArray<FKey>())
-		{
-			if (Key.IsGamepadKey() == (Device != EKzUIInputDevice::Keyboard))
-			{
-				Icon = Theme ? Theme->GetKeyIcon(Key, Device) : nullptr;
-				FallbackText = Icon ? FText::GetEmpty() : Key.GetDisplayName();
-				break;
-			}
-		}
-		if (!Icon)
-		{
-			ClearIcon();
-			return;
-		}
+		ClearIcon();
+		return;
 	}
 
 	// A material has no size of its own, and a variation wraps a texture that does
@@ -167,7 +184,7 @@ void UKzInputIcon::RefreshIcon()
 	if (!Variation.IsNone())
 	{
 		UTexture2D* Texture = Cast<UTexture2D>(Icon);
-		UMaterialInterface* VariationMaterial = Theme->GetVariation(Variation);
+		UMaterialInterface* VariationMaterial = Context.Theme ? Context.Theme->GetVariation(Variation) : nullptr;
 		if (Texture && VariationMaterial)
 		{
 			// The dynamic instance persists across device changes: only the texture parameter
@@ -179,7 +196,7 @@ void UKzInputIcon::RefreshIcon()
 				Material = UMaterialInstanceDynamic::Create(VariationMaterial, this);
 				SetBrushFromMaterial(Material);
 			}
-			Material->SetTextureParameterValue(Theme->VariationTextureParameter, Texture);
+			Material->SetTextureParameterValue(Context.Theme->VariationTextureParameter, Texture);
 			return;
 		}
 		UE_LOG(LogKzUI, Warning, TEXT("[%s] Icon variation '%s' not applied: %s"), *GetName(), *Variation.ToString(), VariationMaterial ? TEXT("the resolved icon is not a plain texture") : TEXT("the theme does not define it"));
