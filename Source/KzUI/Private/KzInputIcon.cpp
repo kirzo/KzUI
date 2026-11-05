@@ -94,10 +94,12 @@ UKzUIInputSubsystem* UKzInputIcon::BindPlayerSubsystem()
 		if (UKzUIInputSubsystem* Previous = BoundSubsystem.Get())
 		{
 			Previous->OnInputDeviceChanged.RemoveDynamic(this, &UKzInputIcon::OnInputDeviceChanged);
+			Previous->OnInputMappingsChanged.RemoveDynamic(this, &UKzInputIcon::OnInputMappingsChanged);
 		}
 		if (Subsystem)
 		{
 			Subsystem->OnInputDeviceChanged.AddUniqueDynamic(this, &UKzInputIcon::OnInputDeviceChanged);
+			Subsystem->OnInputMappingsChanged.AddUniqueDynamic(this, &UKzInputIcon::OnInputMappingsChanged);
 		}
 		BoundSubsystem = Subsystem;
 	}
@@ -215,6 +217,11 @@ void UKzInputIcon::ClearIcon()
 }
 
 void UKzInputIcon::OnInputDeviceChanged(EKzUIInputDevice InputDevice)
+{
+	RefreshIcon();
+}
+
+void UKzInputIcon::OnInputMappingsChanged()
 {
 	RefreshIcon();
 }

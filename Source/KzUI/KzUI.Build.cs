@@ -23,6 +23,7 @@ public class KzUI : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"EnhancedInput",
 				"ApplicationCore",
 				"Slate",
 				"SlateCore"

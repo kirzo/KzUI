@@ -7,7 +7,7 @@
 #include "KzUITypes.h"
 #include "KzInputIcon.generated.h"
 
-/** Displays an input icon of the active icon theme, for whatever its source names (a UI input, a key, a custom icon...), refreshed automatically when the input device changes. */
+/** Displays an input icon of the active icon theme, for whatever its source names (a UI input, a key, an Enhanced Input action...), refreshed automatically when the player's device or key mappings change. */
 UCLASS(meta = (PrioritizeCategories = "Icon Image"))
 class KZUI_API UKzInputIcon : public UKzImage
 {
@@ -71,7 +71,7 @@ private:
 
 	void RefreshIcon();
 
-	/** Subscribes to the device changes of the player's subsystem, moving the subscription if the player changed. */
+	/** Subscribes to the device and mapping changes of the player's subsystem, moving the subscription if the player changed. */
 	class UKzUIInputSubsystem* BindPlayerSubsystem();
 
 	/** Shows no icon at all, rather than the last device's icon or the white box of an empty brush. */
@@ -79,6 +79,10 @@ private:
 
 	UFUNCTION()
 	void OnInputDeviceChanged(EKzUIInputDevice InputDevice);
+
+	/** Sources that read the player's key mappings, like an Enhanced Input action, change with them. */
+	UFUNCTION()
+	void OnInputMappingsChanged();
 
 	EActiveTimerReturnType UpdateHoldProgress();
 

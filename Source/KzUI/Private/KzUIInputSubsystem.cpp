@@ -17,6 +17,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/World.h"
+#include "EnhancedInputSubsystems.h"
 #include "GameFramework/PlayerController.h"
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
@@ -204,6 +205,12 @@ void UKzUIInputSubsystem::RefreshGamepadConnection(bool bBroadcast)
 void UKzUIInputSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+
+	// Both subsystems live as long as their local player, so the binding is never removed
+	if (UEnhancedInputLocalPlayerSubsystem* EnhancedInput = Collection.InitializeDependency<UEnhancedInputLocalPlayerSubsystem>())
+	{
+		EnhancedInput->ControlMappingsRebuiltDelegate.AddDynamic(this, &UKzUIInputSubsystem::HandleControlMappingsRebuilt);
+	}
 
 	if (FSlateApplication::IsInitialized() && InputPreprocessorUsers++ == 0)
 	{

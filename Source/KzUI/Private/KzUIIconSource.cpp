@@ -6,6 +6,9 @@
 #include "KzUIInputSettings.h"
 #include "KzUserWidget.h"
 
+#include "Engine/LocalPlayer.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
 #include "Modules/ModuleManager.h"
 #include "UObject/UObjectIterator.h"
 
@@ -126,4 +129,30 @@ bool FKzUIIconSource_Key::InitFromToken(const FString& Token, const UKzUIIconThe
 	}
 	Key = Parsed;
 	return true;
+}
+
+FKzUIIconResolution FKzUIIconSource_InputActionBase::Resolve(const FKzUIIconContext& Context) const
+{
+	FKzUIIconResolution Resolution;
+	const UEnhancedInputLocalPlayerSubsystem* EnhancedInput = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(Context.Player);
+	if (!EnhancedInput)
+	{
+		// Without a player there are no mappings: the designer shows the name so the layout has something
+		Resolution.Text = Context.Icon && Context.Icon->IsDesignTime() ? GetPreviewText() : FText::GetEmpty();
+		return Resolution;
+	}
+
+	const UInputAction* Action = GetInputAction(Context);
+	Resolution.Key = Action ? FindKeyForDevice(EnhancedInput->QueryKeysMappedToAction(Action), Context.Device) : FKey();
+	return Resolution;
+}
+
+const UInputAction* FKzUIIconSource_InputAction::GetInputAction(const FKzUIIconContext& Context) const
+{
+	return InputAction;
+}
+
+FText FKzUIIconSource_InputAction::GetPreviewText() const
+{
+	return InputAction ? FText::FromString(InputAction->GetName()) : FText::GetEmpty();
 }

@@ -7,6 +7,7 @@
 #include "StructUtils/InstancedStruct.h"
 #include "KzUIIconSource.generated.h"
 
+class UInputAction;
 class UKzInputIcon;
 class UKzUIIconTheme;
 class ULocalPlayer;
@@ -107,4 +108,32 @@ struct KZUI_API FKzUIIconSource_Key : public FKzUIIconSource
 	virtual FKzUIIconResolution Resolve(const FKzUIIconContext& Context) const override;
 	virtual bool InitFromToken(const FString& Token, const UKzUIIconTheme* Theme) override;
 	virtual int32 GetTokenOrder() const override { return 300; }
+};
+
+/** An Enhanced Input action: the first key mapped to it for the player's device in the contexts they have on, remaps included. Subclasses choose the action. */
+USTRUCT(meta = (Hidden))
+struct KZUI_API FKzUIIconSource_InputActionBase : public FKzUIIconSource
+{
+	GENERATED_BODY()
+
+	virtual FKzUIIconResolution Resolve(const FKzUIIconContext& Context) const override;
+
+	/** The action shown for the context's player. */
+	virtual const UInputAction* GetInputAction(const FKzUIIconContext& Context) const { return nullptr; }
+
+	/** Shown in the designer, where there is no player whose keys to read. */
+	virtual FText GetPreviewText() const { return FText::GetEmpty(); }
+};
+
+/** An Enhanced Input action picked here. */
+USTRUCT(meta = (DisplayName = "Input Action"))
+struct KZUI_API FKzUIIconSource_InputAction : public FKzUIIconSource_InputActionBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Category = Icon, EditAnywhere)
+	TObjectPtr<const UInputAction> InputAction;
+
+	virtual const UInputAction* GetInputAction(const FKzUIIconContext& Context) const override;
+	virtual FText GetPreviewText() const override;
 };

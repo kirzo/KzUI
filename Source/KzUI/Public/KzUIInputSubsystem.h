@@ -18,6 +18,7 @@ class UKzUIIconTheme;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FKzUIInputDeviceChangedSignature, EKzUIInputDevice, InputDevice);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FKzUIGamepadConnectionChangedSignature, bool, bConnected);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FKzUIInputMappingsChangedSignature);
 
 /**
  * Tracks the widgets a local player has on screen and the input device they are using.
@@ -66,6 +67,10 @@ public:
 	/** The player went from having a connected pad to having none, or back: the usual "reconnect your controller" notice. */
 	UPROPERTY(Category = KzUI, BlueprintAssignable)
 	FKzUIGamepadConnectionChangedSignature OnGamepadConnectionChanged;
+
+	/** The player's Enhanced Input key mappings were rebuilt: a mapping context went on or off, or a key was remapped. */
+	UPROPERTY(Category = KzUI, BlueprintAssignable)
+	FKzUIInputMappingsChangedSignature OnInputMappingsChanged;
 
 	/** Whether a pad assigned to this player by the platform is connected. */
 	UFUNCTION(Category = KzUI, BlueprintPure)
@@ -141,6 +146,9 @@ public:
 private:
 	/** Reads whether the player has a connected pad, broadcasting the change. */
 	void RefreshGamepadConnection(bool bBroadcast);
+
+	UFUNCTION()
+	void HandleControlMappingsRebuilt() { OnInputMappingsChanged.Broadcast(); }
 
 	void OnAppActivationChanged(bool bActivated);
 
