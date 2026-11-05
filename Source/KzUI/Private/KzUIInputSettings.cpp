@@ -128,6 +128,18 @@ const FKzUIInputDefinition* UKzUIInputSettings::FindInputDefinition(EKzUIInputTy
 	return Resolved->Find(Input);
 }
 
+int32 UKzUIInputSettings::GetLayerZOrder(FGameplayTag Layer) const
+{
+	for (FGameplayTag Tag = Layer; Tag.IsValid(); Tag = Tag.RequestDirectParent())
+	{
+		if (const int32* ZOrder = Layers.Find(Tag))
+		{
+			return *ZOrder;
+		}
+	}
+	return 0;
+}
+
 void UKzUIInputSettings::PostReloadConfig(FProperty* PropertyThatWasLoaded)
 {
 	Super::PostReloadConfig(PropertyThatWasLoaded);

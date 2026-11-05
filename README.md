@@ -41,6 +41,7 @@
   - [12. A Complete Settings Screen](#12-a-complete-settings-screen)
   - [13. Splash Screens](#13-splash-screens)
   - [14. Local Multiplayer](#14-local-multiplayer)
+  - [15. Layers and the HUD](#15-layers-and-the-hud)
 - [Notes and Caveats](#notes-and-caveats)
 - [Asset Naming](#asset-naming)
 - [Repository Layout](#repository-layout)
@@ -111,6 +112,7 @@ A few deliberate design decisions shape the whole plugin; knowing them makes eve
 - **Settings**: `UKzSpinner`, `UKzSlider`, `UKzToggle` option rows (look-free, `BindWidgetOptional` parts) with per-row snapshot/revert, deferred-apply mode, and **auto-binding to engine settings** (resolution, window mode, quality presets and individual scalability groups, VSync, resolution scale) through `UKzSettingsLibrary`.
 - **Splash**: `UKzSplashWidget` plays `UKzSplashPage` containers (any content, per-page timing/sound/skippability) as a fade sequence, swallowing all input while alive; any button on any device skips.
 - **Prompts**: `UKzPromptWidget` confirm/cancel modal with smart Back handling, spawned in one call with `ShowPrompt` using the project-settings prompt class.
+- **HUD and layers**: `AKzHUD` puts widgets on screen layers named by gameplay tags and ordered in the settings, creates the game's widgets when each map starts, hides layers and pauses the game, both counted by source.
 - **Paging**: `UKzWidgetSwitcher` + `UKzSwitcherPage`, switcher pages that plug into the input model (a screen used as a page registers/focuses on activation and its Back returns to the previous page), with per-page titles and change events.
 
 ### Blueprint tooling
@@ -355,6 +357,20 @@ Nothing extra to enable; it is the default model:
 - A screen with **`bSoloInput`** suspends every *other* player's UI input while it lives: the player who paused owns the menus; the rest resume automatically when it closes.
 - `Add to Player Screen` keeps per-player layouts clean in split-screen; for shared-screen games, `Add to Viewport` from the owning player works equally well.
 
+### 15. Layers and the HUD
+
+`AKzHUD` is a HUD actor, so the engine creates one per player controller in every map, with the class the GameMode names: its state never outlives the map.
+
+1. **Layers**: create gameplay tags under `UI.Layer` (`UI.Layer.HUD`, `UI.Layer.Subtitle`, `UI.Layer.Menu`...) and give each a ZOrder in **Project Settings → KzUI → Layers**; higher draws on top. A tag without an entry takes its closest parent's. KzUI declares none: the layers are the game's.
+2. Create a Blueprint of **`KzHUD`**, fill **Widgets** with the widgets to create when the map starts and their layer, and set it as the GameMode's **HUD Class**.
+3. From any Blueprint, **Get Kz HUD**:
+   - **Add To Layer** puts any other widget on a layer.
+   - **Push Layer Hidden** / **Remove Layer Hidden** hide a layer, for a cinematic or a menu. Hiding `UI.Layer.Gameplay` also hides `UI.Layer.Gameplay.HUD`. The layer shows again once every Source has removed its request, and each widget gets back the visibility it had.
+   - **Push Pause** / **Remove Pause** pause the game with `SetGamePaused`, counted the same way.
+   - **Get Widget** returns the widget of a class on the HUD's layers, such as one it created at the start.
+
+Whoever pushes removes, with the same Source (Self by default in Blueprint). Hidden widgets are collapsed: do not hide a layer whose widgets must keep ticking mid-animation.
+
 ---
 
 ## Notes and Caveats
@@ -407,6 +423,7 @@ KzUI/
 │   │   │   ├── KzPromptWidget.h
 │   │   │   ├── KzSplashWidget.h / KzSplashPage.h
 │   │   │   ├── KzWidgetSwitcher.h / KzSwitcherPage.h
+│   │   │   ├── KzHUD.h                   # Screen layers, hidden layers and pause, per player and map
 │   │   │   ├── KzInputDeviceListener.h
 │   │   │   └── KzUIFunctionLibrary.h
 │   │   └── Private/                      # Implementations + FKzUIStickKeyProcessor

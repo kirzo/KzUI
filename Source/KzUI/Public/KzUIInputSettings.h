@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "GameplayTagContainer.h"
 #include "KzUITypes.h"
 #include "KzUIInputSettings.generated.h"
 
@@ -86,6 +87,13 @@ public:
 	/** Prompt widget spawned by UKzUserWidget::ShowPrompt. Same rename caveat as SoundTheme. */
 	UPROPERTY(Category = Prompt, EditAnywhere, Config)
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
+
+	/** Screen layers that AKzHUD puts widgets on, as gameplay tags, with their ZOrder: higher draws on top. A tag without an entry takes its closest parent's. */
+	UPROPERTY(Category = Layers, EditAnywhere, Config, meta = (Categories = "UI.Layer", ForceInlineRow))
+	TMap<FGameplayTag, int32> Layers;
+
+	/** ZOrder of the layer or of its closest parent in Layers; 0 if none has one. */
+	int32 GetLayerZOrder(FGameplayTag Layer) const;
 
 	/** Volumes the player can set, by the name settings rows and UKzSettingsLibrary::SetVolume use. Applied when each game instance starts, after its first world loads. */
 	UPROPERTY(Category = Audio, EditAnywhere, Config, meta = (ForceInlineRow))
