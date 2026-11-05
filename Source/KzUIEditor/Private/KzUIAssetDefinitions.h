@@ -8,7 +8,7 @@
 #include "KzUISoundTheme.h"
 #include "KzUIAssetDefinitions.generated.h"
 
-/** KzUI assets sit in the User Interface category of the Content Browser, next to the Widget Blueprint. */
+/** KzUI assets sit in KzLib/UI of the Content Browser with the rest of the Kz family: the path merges with KzLib's category by name, so KzLib is not needed. */
 UCLASS(Abstract)
 class UAssetDefinition_KzUI : public UAssetDefinitionDefault
 {
@@ -18,7 +18,7 @@ public:
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(64, 201, 255)); }
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{
-		static const auto Categories = { EAssetCategoryPaths::UI };
+		static const FAssetCategoryPath Categories[] = { FAssetCategoryPath(INVTEXT("KzLib"), INVTEXT("UI")) };
 		return Categories;
 	}
 };
