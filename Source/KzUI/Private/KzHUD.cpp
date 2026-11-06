@@ -96,7 +96,7 @@ UUserWidget* AKzHUD::GetWidget(TSubclassOf<UUserWidget> Class) const
 	for (const FLayerWidget& Entry : LayerWidgets)
 	{
 		UUserWidget* Widget = Entry.Widget.Get();
-		if (Widget && Class && Widget->IsA(Class))
+		if (Widget && Widget->IsInViewport() && Class && Widget->IsA(Class))
 		{
 			return Widget;
 		}
@@ -106,7 +106,8 @@ UUserWidget* AKzHUD::GetWidget(TSubclassOf<UUserWidget> Class) const
 
 void AKzHUD::RefreshLayers()
 {
-	LayerWidgets.RemoveAll([](const FLayerWidget& Entry) { return !Entry.Widget.IsValid(); });
+	// A widget removed from the screen leaves its layer
+	LayerWidgets.RemoveAll([](const FLayerWidget& Entry) { return !Entry.Widget.IsValid() || !Entry.Widget->IsInViewport(); });
 
 	for (FLayerWidget& Entry : LayerWidgets)
 	{
