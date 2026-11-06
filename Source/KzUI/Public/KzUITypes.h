@@ -52,7 +52,7 @@ enum class EKzUICursorPolicy : uint8
 {
 	/** KzUI never touches the cursor; the game manages it. */
 	Manual,
-	/** The cursor is shown only while the player's current input device is the keyboard/mouse. */
+	/** The cursor is shown only while a navigable screen (a menu, a prompt) is open and the player's current input device is the keyboard/mouse. */
 	ByDevice,
 };
 

@@ -304,6 +304,7 @@ void UKzUIInputSubsystem::RegisterWidget(UKzUserWidget* Widget)
 		{
 			FocusTopWidget();
 		}
+		ApplyCursorPolicy();
 	}
 }
 
@@ -319,6 +320,7 @@ void UKzUIInputSubsystem::UnregisterWidget(UKzUserWidget* Widget)
 		{
 			FocusTopWidget();
 		}
+		ApplyCursorPolicy();
 	}
 }
 
@@ -638,9 +640,19 @@ void UKzUIInputSubsystem::ApplyCursorPolicy()
 	}
 
 	const ULocalPlayer* LocalPlayer = GetLocalPlayer<ULocalPlayer>();
-	if (APlayerController* PlayerController = LocalPlayer ? LocalPlayer->PlayerController.Get() : nullptr)
+	APlayerController* PlayerController = LocalPlayer ? LocalPlayer->PlayerController.Get() : nullptr;
+	if (!PlayerController)
 	{
-		PlayerController->SetShowMouseCursor(Settings->bSupportsMouse && CurrentInputDevice == EKzUIInputDevice::Keyboard);
+		return;
+	}
+
+	// Only menus take the mouse: in gameplay it stays with the game (the camera)
+	const bool bMenuOpen = WidgetStack.ContainsByPredicate([](const UKzUserWidget* Widget) { return IsValid(Widget) && Widget->IsA<UKzNavigableWidget>(); });
+	const bool bWasShown = PlayerController->ShouldShowMouseCursor();
+	PlayerController->SetShowMouseCursor(Settings->bSupportsMouse && bMenuOpen && CurrentInputDevice == EKzUIInputDevice::Keyboard);
+	if (bWasShown && !bMenuOpen)
+	{
+		RecaptureMouse();
 	}
 }
 

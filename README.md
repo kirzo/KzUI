@@ -152,7 +152,7 @@ Everything global lives in **Project Settings → Plugins → KzUI**:
 
 1. **Input Map**: every semantic input ships with gamepad defaults (Accept = bottom face button, Back = right face button, navigation = left stick + dpad, Previous/Next = shoulders, Start/Select = specials) and additive keyboard keys (WASD/arrows, Space, BackSpace, Enter, Tab). Adjust keys per input in `Override`/`Additive`/`Subtractive` mode: the **Keyboard** override rewrites the keyboard and mouse keys, while **Xbox**, **Play Station** and **Nintendo** rewrite the gamepad keys whenever the player's last pad belongs to that family. The Nintendo entries demonstrate swapped Accept/Back.
 2. **Device Mappings**: hardware device name → device family (`DualSense`, `DualShock`, `Xbox`, `Switch`, `Keyboard`...), used for both the icons and the pad overrides. The defaults cover XInput, WinDualShock, the common GameInput identifiers and [SDLGamepad](https://github.com/kirzo/SDLGamepad); add your own if your platform reports different names.
-3. **Cursor Policy**: `Manual` (KzUI never touches the mouse cursor) or `ByDevice` (cursor visible only while the player uses keyboard/mouse).
+3. **Cursor Policy**: `Manual` (KzUI never touches the mouse cursor) or `ByDevice` (cursor visible only while a navigable screen, such as a menu or a prompt, is open and the player uses keyboard/mouse; in gameplay the mouse stays with the game).
 4. **Sound Theme / Icon Theme / Prompt Class**: assign once; later tutorials create them.
 5. **Gamepad Icons On Keyboard**: for games whose prompts are drawn for a pad. A player on the keyboard sees the icons of their last pad (the platform's own before they use one); only the icons change, the keyboard keeps working.
 
