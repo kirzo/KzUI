@@ -88,7 +88,7 @@ public:
 	UPROPERTY(Category = Prompt, EditAnywhere, Config)
 	TSoftClassPtr<UKzPromptWidget> PromptClass;
 
-	/** Screen layers that AKzHUD puts widgets on, as gameplay tags, with their ZOrder: higher draws on top. A tag without an entry takes its closest parent's. */
+	/** Screen layers that AKzHUD puts widgets on, as gameplay tags, with their ZOrder: higher draws on top. Starts with UI.Layer.HUD (0) and UI.Layer.Menu (100). A tag without an entry takes its closest parent's. */
 	UPROPERTY(Category = Layers, EditAnywhere, Config, meta = (Categories = "UI.Layer", ForceInlineRow))
 	TMap<FGameplayTag, int32> Layers;
 

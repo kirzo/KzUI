@@ -8,6 +8,12 @@
 
 #define LOCTEXT_NAMESPACE "KzUI"
 
+namespace Kz::Tags::UI
+{
+	UE_DEFINE_GAMEPLAY_TAG(HUDLayer, "UI.Layer.HUD");
+	UE_DEFINE_GAMEPLAY_TAG(MenuLayer, "UI.Layer.Menu");
+}
+
 /** Keys and triggers a project starts with, also used to fill entries missing from an older saved config. */
 static TMap<EKzUIInputType, FKzUIInputData> MakeDefaultInputMap()
 {
@@ -94,6 +100,9 @@ UKzUIInputSettings::UKzUIInputSettings()
 	DeviceMappings.Add("I8042", EKzUIInputDevice::Keyboard);
 
 	InputMap = MakeDefaultInputMap();
+
+	Layers.Add(Kz::Tags::UI::HUDLayer, 0);
+	Layers.Add(Kz::Tags::UI::MenuLayer, 100);
 }
 
 void UKzUIInputSettings::PostInitProperties()

@@ -4,9 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
+#include "NativeGameplayTags.h"
 #include "KzUITypes.generated.h"
 
 KZUI_API DECLARE_LOG_CATEGORY_EXTERN(LogKzUI, Log, All);
+
+/** The two layers almost every game has, already in the settings' Layers. A project adds its own under UI.Layer. */
+namespace Kz::Tags::UI
+{
+	KZUI_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(HUDLayer);
+	KZUI_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(MenuLayer);
+}
 
 UENUM(BlueprintType, meta = (Bitflags))
 enum class EKzUIInputType : uint8

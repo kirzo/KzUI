@@ -361,7 +361,7 @@ Nothing extra to enable; it is the default model:
 
 `AKzHUD` is a HUD actor, so the engine creates one per player controller in every map, with the class the GameMode names: its state never outlives the map.
 
-1. **Layers**: create gameplay tags under `UI.Layer` (`UI.Layer.HUD`, `UI.Layer.Subtitle`, `UI.Layer.Menu`...) and give each a ZOrder in **Project Settings → KzUI → Layers**; higher draws on top. A tag without an entry takes its closest parent's. KzUI declares none: the layers are the game's.
+1. **Layers**: **Project Settings → KzUI → Layers** gives each layer tag a ZOrder; higher draws on top. KzUI declares the two almost every game has, `UI.Layer.HUD` (0) and `UI.Layer.Menu` (100). Add your own as gameplay tags under `UI.Layer` (`UI.Layer.Subtitle`...) with their ZOrder. A tag without an entry takes its closest parent's.
 2. Create a Blueprint of **`KzHUD`**, fill **Widgets** with the widgets to create when the map starts and their layer, and set it as the GameMode's **HUD Class**.
 3. From any Blueprint, **Get Kz HUD**:
    - **Add To Layer** puts any other widget on a layer.
