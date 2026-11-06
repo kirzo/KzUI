@@ -111,13 +111,13 @@ void AKzHUD::RefreshLayers()
 	for (FLayerWidget& Entry : LayerWidgets)
 	{
 		UUserWidget* Widget = Entry.Widget.Get();
-		const bool bHidden = IsLayerHidden(Entry.Layer);
-		if (bHidden && !Entry.ShownVisibility.IsSet())
+		const bool bLayerHidden = IsLayerHidden(Entry.Layer);
+		if (bLayerHidden && !Entry.ShownVisibility.IsSet())
 		{
 			Entry.ShownVisibility = Widget->GetVisibility();
 			Widget->SetVisibility(ESlateVisibility::Collapsed);
 		}
-		else if (!bHidden && Entry.ShownVisibility.IsSet())
+		else if (!bLayerHidden && Entry.ShownVisibility.IsSet())
 		{
 			Widget->SetVisibility(Entry.ShownVisibility.GetValue());
 			Entry.ShownVisibility.Reset();
