@@ -91,12 +91,6 @@ void UK2Node_SwitchOnKzOption::ValidateNodeDuringCompilation(FCompilerResultsLog
 		MessageLog.Warning(TEXT("@@ only works in a Kz Navigable Widget Blueprint."), this);
 	}
 
-	const UEdGraphPin* OptionPin = FindPin(OptionPinName, EGPD_Input);
-	if (OptionPin && OptionPin->LinkedTo.Num() == 0)
-	{
-		MessageLog.Warning(TEXT("@@ has no Option connected, so it always takes Default."), this);
-	}
-
 	TArray<FName> Names;
 	bool bSkippedDefault = false;
 	if (CollectOptionNames(Names, nullptr, &bSkippedDefault) && bSkippedDefault)
@@ -127,6 +121,12 @@ void UK2Node_SwitchOnKzOption::ExpandNode(FKismetCompilerContext& CompilerContex
 	const UEdGraphSchema_K2* Schema = CompilerContext.GetSchema();
 	UEdGraphPin* ExecPin = GetExecPin();
 	UEdGraphPin* OptionPin = FindPinChecked(OptionPinName, EGPD_Input);
+
+	// Checked here, not in ValidateNodeDuringCompilation: that runs after the expansion has broken the links
+	if (OptionPin->LinkedTo.Num() == 0)
+	{
+		CompilerContext.MessageLog.Warning(TEXT("@@ has no Option connected, so it always takes Default."), this);
+	}
 
 	// Chain of "is it named X?" branches, one per option pin, falling through to Default
 	UEdGraphPin* ChainPin = ExecPin;
