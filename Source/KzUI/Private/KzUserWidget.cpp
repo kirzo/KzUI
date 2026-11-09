@@ -468,7 +468,16 @@ void UKzUserWidget::AttachChild(UKzUserWidget* Content)
 
 	ChildWidget = Content;
 	Content->ModalOwner = this;
-	Content->SetFocus();
+
+	// The stack picks the widget: a child without input of its own (a tab host) passes the focus to its active page
+	if (UKzUIInputSubsystem* Subsystem = UKzUIInputSubsystem::Get(GetOwningLocalPlayer()))
+	{
+		Subsystem->FocusTopWidget();
+	}
+	else
+	{
+		Content->SetFocus();
+	}
 }
 
 void UKzUserWidget::ReleaseModalLinks(bool bPropagate)
